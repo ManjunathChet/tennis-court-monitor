@@ -553,7 +553,7 @@
             
             <div class="contact-info">
                 <h3>📞 Contact & Support</h3>
-                <p><strong>Tool Support:</strong> <a href="mailto:your-email@example.com" style="color: #27ae60;">your-email@example.com</a></p>
+                <p><strong>Tool Support:</strong> <a href="mailto:tenniscourtmonitor@gmail.com" style="color: #27ae60;">tenniscourtmonitor@gmail.com</a></p>
                 <p><strong>Central Park Tennis Center:</strong> (212) 280-0205</p>
                 <p><strong>NYC Parks Tennis:</strong> <a href="https://www.nycgovparks.org/things-to-do/tennis" target="_blank" style="color: #27ae60;">Official Tennis Information</a></p>
                 <p style="margin-top: 15px; font-size: 0.9em; color: #666;">
@@ -853,7 +853,7 @@
             return results;
         }
         
-        // Check court availability
+        // Check court availability with debugging
         async function checkAvailability() {
             const checkBtn = document.getElementById('checkBtn');
             const resultsDiv = document.getElementById('results');
@@ -862,25 +862,87 @@
             checkBtn.textContent = 'Checking...';
             resultsDiv.innerHTML = '<div class="loading">Checking court availability...</div>';
             
+            // Debug info
+            let debugInfo = [];
+            debugInfo.push(`🕐 Started at: ${new Date().toLocaleTimeString()}`);
+            
             try {
-                // Use CORS proxy to avoid cross-origin issues
-                const proxyUrl = 'https://api.allorigins.win/raw?url=';
-                const targetUrl = encodeURIComponent('https://www.nycgovparks.org/tennisreservation/availability/12');
-                const response = await fetch(proxyUrl + targetUrl);
+                // Try multiple proxy services
+                const proxies = [
+                    'https://api.allorigins.win/raw?url=',
+                    'https://api.codetabs.com/v1/proxy?quest=',
+                    'https://cors-anywhere.herokuapp.com/'
+                ];
                 
-                if (!response.ok) {
-                    throw new Error('Failed to fetch court data');
+                const targetUrl = 'https://www.nycgovparks.org/tennisreservation/availability/12';
+                debugInfo.push(`🎯 Target URL: ${targetUrl}`);
+                
+                let response = null;
+                let proxyUsed = '';
+                
+                for (let i = 0; i < proxies.length; i++) {
+                    const proxy = proxies[i];
+                    const fullUrl = proxy + encodeURIComponent(targetUrl);
+                    
+                    try {
+                        debugInfo.push(`🔄 Trying proxy ${i + 1}: ${proxy}`);
+                        
+                        response = await fetch(fullUrl, {
+                            method: 'GET',
+                            headers: {
+                                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                            }
+                        });
+                        
+                        debugInfo.push(`📊 Response status: ${response.status} ${response.statusText}`);
+                        
+                        if (response.ok) {
+                            proxyUsed = proxy;
+                            debugInfo.push(`✅ Success with proxy: ${proxy}`);
+                            break;
+                        } else {
+                            debugInfo.push(`❌ Failed with proxy: ${proxy} (${response.status})`);
+                        }
+                    } catch (proxyError) {
+                        debugInfo.push(`❌ Proxy error: ${proxy} - ${proxyError.message}`);
+                        continue;
+                    }
                 }
                 
+                if (!response || !response.ok) {
+                    throw new Error('All proxy attempts failed');
+                }
+                
+                debugInfo.push(`📥 Fetching response text...`);
                 const htmlContent = await response.text();
+                debugInfo.push(`📄 Content length: ${htmlContent.length} characters`);
+                debugInfo.push(`🔍 First 200 chars: ${htmlContent.substring(0, 200)}...`);
+                
+                // Check if we got actual HTML or an error page
+                if (htmlContent.includes('<html') || htmlContent.includes('<!DOCTYPE')) {
+                    debugInfo.push(`✅ Valid HTML received`);
+                } else {
+                    debugInfo.push(`⚠️ Response doesn't look like HTML`);
+                }
+                
+                debugInfo.push(`🔧 Parsing court data...`);
                 const courtData = parseCourtData(htmlContent);
+                debugInfo.push(`📊 Raw Saturday slots: ${courtData.saturday.available.length}`);
+                debugInfo.push(`📊 Raw Sunday slots: ${courtData.sunday.available.length}`);
                 
                 // Apply time filters
                 courtData.saturday.available = filterSlotsByTime(courtData.saturday.available);
                 courtData.sunday.available = filterSlotsByTime(courtData.sunday.available);
                 
+                debugInfo.push(`🎯 Filtered Saturday slots: ${courtData.saturday.available.length}`);
+                debugInfo.push(`🎯 Filtered Sunday slots: ${courtData.sunday.available.length}`);
+                
                 displayResults(courtData);
                 updateLastChecked();
+                
+                // Show debug info in console
+                console.log('Debug Info:', debugInfo);
                 
                 // Check if there are any available courts and send notifications
                 const hasAvailable = courtData.saturday.available.length > 0 || courtData.sunday.available.length > 0;
@@ -912,24 +974,56 @@
                 }
                 
             } catch (error) {
-                console.error('Error checking availability:', error);
+                debugInfo.push(`💥 Error: ${error.message}`);
+                debugInfo.push(`📍 Error stack: ${error.stack}`);
+                
+                console.error('Full error details:', error);
+                console.log('Debug trace:', debugInfo);
+                
                 resultsDiv.innerHTML = `
                     <div class="status-card unavailable">
                         <h3>❌ Error Checking Availability</h3>
-                        <p>Unable to check court availability. This could be due to:</p>
+                        <p><strong>Error:</strong> ${error.message}</p>
+                        
+                        <div style="margin: 15px 0;">
+                            <button onclick="toggleDebugInfo()" style="background: #dc3545; min-width: auto; padding: 8px 16px;">
+                                Show Debug Info
+                            </button>
+                        </div>
+                        
+                        <div id="debugInfo" style="display: none; background: #f8f9fa; padding: 15px; border-radius: 5px; font-family: monospace; font-size: 12px; margin: 10px 0;">
+                            ${debugInfo.map(info => `<div>${info}</div>`).join('')}
+                        </div>
+                        
+                        <p><strong>Possible solutions:</strong></p>
                         <ul style="margin: 10px 0; padding-left: 20px;">
-                            <li>Network connectivity issues</li>
-                            <li>NYC Parks website temporarily unavailable</li>
-                            <li>CORS proxy service temporarily down</li>
+                            <li>Check browser console (F12) for detailed errors</li>
+                            <li>Try disabling browser extensions temporarily</li>
+                            <li>Test in an incognito/private browser window</li>
+                            <li>Verify internet connection</li>
                         </ul>
-                        <p><strong>Try again in a few minutes or check manually:</strong> <a href="https://www.nycgovparks.org/tennisreservation/availability/12" target="_blank">Central Park Tennis Reservations</a></p>
-                        <p style="font-size: 0.9em; color: #666; margin-top: 15px;">If this error persists, the tool may need updates to handle changes in the NYC Parks website.</p>
+                        
+                        <p><strong>Manual check:</strong> <a href="https://www.nycgovparks.org/tennisreservation/availability/12" target="_blank">Central Park Tennis Reservations</a></p>
                     </div>
                 `;
             }
             
             checkBtn.disabled = false;
             checkBtn.textContent = 'Check Now';
+        }
+        
+        // Toggle debug info visibility
+        function toggleDebugInfo() {
+            const debugDiv = document.getElementById('debugInfo');
+            const button = event.target;
+            
+            if (debugDiv.style.display === 'none') {
+                debugDiv.style.display = 'block';
+                button.textContent = 'Hide Debug Info';
+            } else {
+                debugDiv.style.display = 'none';
+                button.textContent = 'Show Debug Info';
+            }
         }
         
         // Display results
