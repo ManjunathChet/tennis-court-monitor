@@ -863,10 +863,10 @@
             resultsDiv.innerHTML = '<div class="loading">Checking court availability...</div>';
             
             try {
-                const response = await fetch('https://www.nycgovparks.org/tennisreservation/availability/12', {
-                    method: 'GET',
-                    mode: 'cors'
-                });
+                // Use CORS proxy to avoid cross-origin issues
+                const proxyUrl = 'https://api.allorigins.win/raw?url=';
+                const targetUrl = encodeURIComponent('https://www.nycgovparks.org/tennisreservation/availability/12');
+                const response = await fetch(proxyUrl + targetUrl);
                 
                 if (!response.ok) {
                     throw new Error('Failed to fetch court data');
@@ -916,8 +916,14 @@
                 resultsDiv.innerHTML = `
                     <div class="status-card unavailable">
                         <h3>❌ Error Checking Availability</h3>
-                        <p>Unable to check court availability. This could be due to network issues or the NYC Parks website being temporarily unavailable.</p>
+                        <p>Unable to check court availability. This could be due to:</p>
+                        <ul style="margin: 10px 0; padding-left: 20px;">
+                            <li>Network connectivity issues</li>
+                            <li>NYC Parks website temporarily unavailable</li>
+                            <li>CORS proxy service temporarily down</li>
+                        </ul>
                         <p><strong>Try again in a few minutes or check manually:</strong> <a href="https://www.nycgovparks.org/tennisreservation/availability/12" target="_blank">Central Park Tennis Reservations</a></p>
+                        <p style="font-size: 0.9em; color: #666; margin-top: 15px;">If this error persists, the tool may need updates to handle changes in the NYC Parks website.</p>
                     </div>
                 `;
             }
