@@ -938,63 +938,102 @@
             debugInfo.push(`🕐 Started at: ${new Date().toLocaleTimeString()}`);
             
             try {
-                // Try multiple proxy services
+                // Try multiple proxy services with different approaches
                 const proxies = [
-                    'https://api.allorigins.win/raw?url=',
-                    'https://api.codetabs.com/v1/proxy?quest=',
-                    'https://cors-anywhere.herokuapp.com/'
+                    {
+                        name: 'AllOrigins (get)',
+                        url: 'https://api.allorigins.win/get?url=',
+                        type: 'json'
+                    },
+                    {
+                        name: 'AllOrigins (raw)',
+                        url: 'https://api.allorigins.win/raw?url=',
+                        type: 'text'
+                    },
+                    {
+                        name: 'ThingProxy',
+                        url: 'https://thingproxy.freeboard.io/fetch/',
+                        type: 'text'
+                    },
+                    {
+                        name: 'CORS Proxy (alternative)',
+                        url: 'https://api.codetabs.com/v1/proxy/?quest=',
+                        type: 'text'
+                    }
                 ];
                 
                 const targetUrl = 'https://www.nycgovparks.org/tennisreservation/availability/12';
                 debugInfo.push(`🎯 Target URL: ${targetUrl}`);
                 
                 let response = null;
+                let htmlContent = '';
                 let proxyUsed = '';
                 
                 for (let i = 0; i < proxies.length; i++) {
                     const proxy = proxies[i];
-                    const fullUrl = proxy + encodeURIComponent(targetUrl);
+                    const fullUrl = proxy.url + encodeURIComponent(targetUrl);
                     
                     try {
-                        debugInfo.push(`🔄 Trying proxy ${i + 1}: ${proxy}`);
+                        debugInfo.push(`🔄 Trying ${proxy.name}: ${proxy.url}`);
                         
                         response = await fetch(fullUrl, {
                             method: 'GET',
                             headers: {
-                                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-                            }
+                                'Accept': 'application/json, text/html, */*'
+                            },
+                            // Remove User-Agent and other problematic headers
+                            mode: 'cors'
                         });
                         
                         debugInfo.push(`📊 Response status: ${response.status} ${response.statusText}`);
                         
                         if (response.ok) {
-                            proxyUsed = proxy;
-                            debugInfo.push(`✅ Success with proxy: ${proxy}`);
-                            break;
+                            if (proxy.type === 'json') {
+                                const jsonData = await response.json();
+                                htmlContent = jsonData.contents || jsonData.data || '';
+                                debugInfo.push(`📄 JSON response, contents length: ${htmlContent.length}`);
+                            } else {
+                                htmlContent = await response.text();
+                                debugInfo.push(`📄 Text response length: ${htmlContent.length}`);
+                            }
+                            
+                            if (htmlContent.length > 100) {
+                                proxyUsed = proxy.name;
+                                debugInfo.push(`✅ Success with ${proxy.name}`);
+                                break;
+                            } else {
+                                debugInfo.push(`⚠️ Response too short from ${proxy.name}`);
+                            }
                         } else {
-                            debugInfo.push(`❌ Failed with proxy: ${proxy} (${response.status})`);
+                            debugInfo.push(`❌ Failed with ${proxy.name} (${response.status})`);
                         }
                     } catch (proxyError) {
-                        debugInfo.push(`❌ Proxy error: ${proxy} - ${proxyError.message}`);
+                        debugInfo.push(`❌ Proxy error: ${proxy.name} - ${proxyError.message}`);
                         continue;
                     }
                 }
                 
-                if (!response || !response.ok) {
-                    throw new Error('All proxy attempts failed');
+                if (!htmlContent || htmlContent.length < 100) {
+                    // Last resort: try direct fetch (will probably fail but worth trying)
+                    debugInfo.push(`🔄 Trying direct fetch as last resort...`);
+                    try {
+                        response = await fetch(targetUrl, { mode: 'no-cors' });
+                        debugInfo.push(`📊 Direct fetch status: ${response.status}`);
+                    } catch (directError) {
+                        debugInfo.push(`❌ Direct fetch failed: ${directError.message}`);
+                    }
+                    
+                    throw new Error('All proxy attempts failed or returned empty content');
                 }
                 
-                debugInfo.push(`📥 Fetching response text...`);
-                const htmlContent = await response.text();
-                debugInfo.push(`📄 Content length: ${htmlContent.length} characters`);
                 debugInfo.push(`🔍 First 200 chars: ${htmlContent.substring(0, 200)}...`);
                 
                 // Check if we got actual HTML or an error page
-                if (htmlContent.includes('<html') || htmlContent.includes('<!DOCTYPE')) {
+                if (htmlContent.includes('<html') || htmlContent.includes('<!DOCTYPE') || htmlContent.includes('<table')) {
                     debugInfo.push(`✅ Valid HTML received`);
                 } else {
                     debugInfo.push(`⚠️ Response doesn't look like HTML`);
+                    debugInfo.push(`📝 Full response preview: ${htmlContent.substring(0, 500)}`);
                 }
                 
                 debugInfo.push(`🔧 Parsing court data...`);
@@ -1066,15 +1105,20 @@
                             ${debugInfo.map(info => `<div>${info}</div>`).join('')}
                         </div>
                         
-                        <p><strong>Possible solutions:</strong></p>
+                        <p><strong>Alternative solutions:</strong></p>
                         <ul style="margin: 10px 0; padding-left: 20px;">
-                            <li>Check browser console (F12) for detailed errors</li>
-                            <li>Try disabling browser extensions temporarily</li>
-                            <li>Test in an incognito/private browser window</li>
-                            <li>Verify internet connection</li>
+                            <li><strong>Browser Extension:</strong> Install a CORS extension temporarily</li>
+                            <li><strong>Local Development:</strong> Run from localhost instead</li>
+                            <li><strong>Backend Service:</strong> Set up a simple proxy server</li>
+                            <li><strong>Manual Checking:</strong> Use the direct link below</li>
                         </ul>
                         
                         <p><strong>Manual check:</strong> <a href="https://www.nycgovparks.org/tennisreservation/availability/12" target="_blank">Central Park Tennis Reservations</a></p>
+                        
+                        <div style="margin-top: 15px; padding: 10px; background: #e8f4f8; border-radius: 5px; font-size: 0.9em;">
+                            <strong>💡 Technical Note:</strong> The issue is that modern browsers block cross-origin requests for security. 
+                            This is a fundamental limitation when trying to fetch external websites from a client-side application.
+                        </div>
                     </div>
                 `;
             }
