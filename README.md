@@ -4,7 +4,7 @@ Monitors NYC Parks for Central Park tennis court availability and sends SMS noti
 
 ## Quick Setup
 
-1. **Access**: Visit the hosted page at `https://yourusername.github.io/tennis-court-monitor`
+1. **Access**: Visit the hosted page at `https://manjunathchet.github.io/tennis-court-monitor`
 2. **Check**: Click "Check Now" to see current weekend availability
 3. **SMS Setup** (optional):
    - Sign up at [twilio.com](https://www.twilio.com)
@@ -21,12 +21,6 @@ Monitors NYC Parks for Central Park tennis court availability and sends SMS noti
 - Filters by time preference (morning/evening)
 - Sends notifications when courts become available
 - Links directly to NYC Parks reservation system
-
-## SMS Costs
-
-- ~$0.75 per 100 SMS messages
-- $1/month for Twilio phone number
-- Free tier available for testing
 
 ## Twilio Phone Number Setup
 
