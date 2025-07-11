@@ -786,8 +786,10 @@
             });
         }
         
-        // Parse the website content to find available courts
+        // Parse the website content to find available courts - with enhanced debugging
         function parseCourtData(htmlContent) {
+            console.log("🔍 Starting HTML parsing...");
+            
             const parser = new DOMParser();
             const doc = parser.parseFromString(htmlContent, 'text/html');
             
@@ -806,50 +808,119 @@
                 day: 'numeric' 
             });
             
+            console.log("📅 Looking for dates:", { saturdayStr, sundayStr });
+            
             const results = {
                 saturday: { available: [], date: saturdayStr },
                 sunday: { available: [], date: sundayStr }
             };
             
-            // Look for "Reserve this time" links in weekend sections
+            // Debug: Log the first 2000 characters to see structure
+            console.log("📄 HTML Preview:", htmlContent.substring(0, 2000));
+            
+            // Look for all "Reserve this time" links
             const reserveLinks = doc.querySelectorAll('a[href*="/tennisreservation/reservecp/"]');
+            console.log(`🔗 Found ${reserveLinks.length} total reservation links`);
             
-            // Since the website structure shows tables by date, we'll look for the pattern
-            const lines = htmlContent.split('\n');
-            let currentDate = '';
-            let inWeekendSection = false;
+            // Log each link for debugging
+            reserveLinks.forEach((link, index) => {
+                console.log(`Link ${index + 1}:`, {
+                    text: link.textContent.trim(),
+                    href: link.href,
+                    innerHTML: link.innerHTML
+                });
+            });
             
-            for (let i = 0; i < lines.length; i++) {
-                const line = lines[i].trim();
+            // More robust parsing - look for table structure
+            const tables = doc.querySelectorAll('table');
+            console.log(`📊 Found ${tables.length} tables`);
+            
+            tables.forEach((table, tableIndex) => {
+                console.log(`\n🔍 Analyzing table ${tableIndex + 1}`);
                 
-                // Check if this line contains a date
-                if (line.includes('Saturday') || line.includes('Sunday')) {
-                    currentDate = line;
-                    inWeekendSection = (line.includes(saturdayStr) || line.includes(sundayStr));
-                }
+                // Look for date headers before this table
+                let currentDate = '';
+                let prevElement = table.previousElementSibling;
+                let lookupCount = 0;
                 
-                // If we're in a weekend section and find a "Reserve this time" link
-                if (inWeekendSection && line.includes('Reserve this time')) {
-                    // Extract time and court info from surrounding context
-                    const timeMatch = line.match(/(\d{1,2}:\d{2}\s*[ap]\.?m\.?)/i);
-                    const courtMatch = line.match(/Court\s*(\d+)/i);
+                // Look backwards for date information
+                while (prevElement && lookupCount < 10) {
+                    const text = prevElement.textContent || prevElement.innerText || '';
+                    console.log(`📝 Previous element ${lookupCount}: "${text.trim()}"`);
                     
-                    if (timeMatch && courtMatch) {
-                        const slot = {
-                            time: timeMatch[1],
-                            court: courtMatch[1],
-                            link: line.match(/href="([^"]*)"/) ? line.match(/href="([^"]*)"/)[1] : ''
-                        };
-                        
-                        if (currentDate.includes('Saturday')) {
-                            results.saturday.available.push(slot);
-                        } else if (currentDate.includes('Sunday')) {
-                            results.sunday.available.push(slot);
-                        }
+                    if (text.includes('Saturday') || text.includes('Sunday')) {
+                        currentDate = text.trim();
+                        console.log(`📅 Found date context: "${currentDate}"`);
+                        break;
                     }
+                    prevElement = prevElement.previousElementSibling;
+                    lookupCount++;
                 }
-            }
+                
+                // Check if this date matches our weekend
+                const isWeekendTable = currentDate.includes(saturdayStr) || 
+                                     currentDate.includes(sundayStr) ||
+                                     currentDate.includes('Saturday') || 
+                                     currentDate.includes('Sunday');
+                
+                console.log(`🎯 Is weekend table: ${isWeekendTable} (context: "${currentDate}")`);
+                
+                if (isWeekendTable) {
+                    // Parse table rows
+                    const rows = table.querySelectorAll('tr');
+                    console.log(`📋 Table has ${rows.length} rows`);
+                    
+                    rows.forEach((row, rowIndex) => {
+                        const cells = row.querySelectorAll('td, th');
+                        const rowText = row.textContent || '';
+                        
+                        // Look for time indicators in the first cell
+                        if (cells.length > 0) {
+                            const firstCellText = cells[0].textContent || '';
+                            const timeMatch = firstCellText.match(/(\d{1,2}:\d{2}\s*[ap]\.?m\.?)/i);
+                            
+                            if (timeMatch) {
+                                console.log(`⏰ Row ${rowIndex} time: "${timeMatch[1]}"`);
+                                
+                                // Check each cell in this row for "Reserve this time" links
+                                cells.forEach((cell, cellIndex) => {
+                                    const reserveLink = cell.querySelector('a[href*="/tennisreservation/reservecp/"]');
+                                    if (reserveLink) {
+                                        const courtMatch = cell.textContent.match(/Court\s*(\d+)/i) || 
+                                                         row.textContent.match(/Court\s*(\d+)/i) ||
+                                                         [`Court ${cellIndex}`]; // Fallback to cell position
+                                        
+                                        console.log(`🎾 Found reservation link:`, {
+                                            time: timeMatch[1],
+                                            court: courtMatch[1] || `${cellIndex}`,
+                                            link: reserveLink.getAttribute('href'),
+                                            cellText: cell.textContent.trim(),
+                                            date: currentDate
+                                        });
+                                        
+                                        const slot = {
+                                            time: timeMatch[1],
+                                            court: courtMatch[1] || `${cellIndex}`,
+                                            link: reserveLink.getAttribute('href')
+                                        };
+                                        
+                                        // Determine which day this belongs to
+                                        if (currentDate.includes('Saturday') || currentDate.includes(saturdayStr)) {
+                                            results.saturday.available.push(slot);
+                                            console.log(`➕ Added to Saturday: ${slot.time} Court ${slot.court}`);
+                                        } else if (currentDate.includes('Sunday') || currentDate.includes(sundayStr)) {
+                                            results.sunday.available.push(slot);
+                                            console.log(`➕ Added to Sunday: ${slot.time} Court ${slot.court}`);
+                                        }
+                                    }
+                                });
+                            }
+                        }
+                    });
+                }
+            });
             
+            console.log("📊 Final results:", results);
             return results;
         }
         
