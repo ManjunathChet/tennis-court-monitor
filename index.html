@@ -967,137 +967,87 @@
             return results;
         }
         
-        // Check court availability with debugging
+        // Check court availability with mobile optimization
         async function checkAvailability() {
             const checkBtn = document.getElementById('checkBtn');
             const resultsDiv = document.getElementById('results');
             
             checkBtn.disabled = true;
             checkBtn.textContent = 'Checking...';
-            resultsDiv.innerHTML = '<div class="loading">Checking court availability...</div>';
+            resultsDiv.innerHTML = '<div class="loading">⏳ Checking court availability...<br><small>This may take 10-20 seconds on mobile</small></div>';
             
-            // Debug info
+            // Performance tracking
+            const startTime = performance.now();
             let debugInfo = [];
             debugInfo.push(`🕐 Started at: ${new Date().toLocaleTimeString()}`);
             
             try {
-                // Try multiple proxy services with different approaches
-                const proxies = [
-                    {
-                        name: 'AllOrigins (get)',
-                        url: 'https://api.allorigins.win/get?url=',
-                        type: 'json'
-                    },
-                    {
-                        name: 'AllOrigins (raw)',
-                        url: 'https://api.allorigins.win/raw?url=',
-                        type: 'text'
-                    },
-                    {
-                        name: 'ThingProxy',
-                        url: 'https://thingproxy.freeboard.io/fetch/',
-                        type: 'text'
-                    },
-                    {
-                        name: 'CORS Proxy (alternative)',
-                        url: 'https://api.codetabs.com/v1/proxy/?quest=',
-                        type: 'text'
-                    }
-                ];
+                // Use only the fastest proxy for mobile
+                const fastProxy = {
+                    name: 'AllOrigins (get)',
+                    url: 'https://api.allorigins.win/get?url=',
+                    type: 'json'
+                };
                 
                 const targetUrl = 'https://www.nycgovparks.org/tennisreservation/availability/12';
-                debugInfo.push(`🎯 Target URL: ${targetUrl}`);
+                const fullUrl = fastProxy.url + encodeURIComponent(targetUrl);
                 
-                let response = null;
-                let htmlContent = '';
-                let proxyUsed = '';
+                debugInfo.push(`🎯 Using fast proxy: ${fastProxy.name}`);
                 
-                for (let i = 0; i < proxies.length; i++) {
-                    const proxy = proxies[i];
-                    const fullUrl = proxy.url + encodeURIComponent(targetUrl);
-                    
-                    try {
-                        debugInfo.push(`🔄 Trying ${proxy.name}: ${proxy.url}`);
-                        
-                        response = await fetch(fullUrl, {
-                            method: 'GET',
-                            headers: {
-                                'Accept': 'application/json, text/html, */*'
-                            },
-                            // Remove User-Agent and other problematic headers
-                            mode: 'cors'
-                        });
-                        
-                        debugInfo.push(`📊 Response status: ${response.status} ${response.statusText}`);
-                        
-                        if (response.ok) {
-                            if (proxy.type === 'json') {
-                                const jsonData = await response.json();
-                                htmlContent = jsonData.contents || jsonData.data || '';
-                                debugInfo.push(`📄 JSON response, contents length: ${htmlContent.length}`);
-                            } else {
-                                htmlContent = await response.text();
-                                debugInfo.push(`📄 Text response length: ${htmlContent.length}`);
-                            }
-                            
-                            if (htmlContent.length > 100) {
-                                proxyUsed = proxy.name;
-                                debugInfo.push(`✅ Success with ${proxy.name}`);
-                                break;
-                            } else {
-                                debugInfo.push(`⚠️ Response too short from ${proxy.name}`);
-                            }
-                        } else {
-                            debugInfo.push(`❌ Failed with ${proxy.name} (${response.status})`);
-                        }
-                    } catch (proxyError) {
-                        debugInfo.push(`❌ Proxy error: ${proxy.name} - ${proxyError.message}`);
-                        continue;
-                    }
+                // Set shorter timeout for mobile
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 25000); // 25 second timeout
+                
+                const response = await fetch(fullUrl, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json'
+                    },
+                    signal: controller.signal,
+                    mode: 'cors'
+                });
+                
+                clearTimeout(timeoutId);
+                
+                const fetchTime = performance.now() - startTime;
+                debugInfo.push(`⚡ Fetch completed in: ${Math.round(fetchTime)}ms`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                 }
                 
-                if (!htmlContent || htmlContent.length < 100) {
-                    // Last resort: try direct fetch (will probably fail but worth trying)
-                    debugInfo.push(`🔄 Trying direct fetch as last resort...`);
-                    try {
-                        response = await fetch(targetUrl, { mode: 'no-cors' });
-                        debugInfo.push(`📊 Direct fetch status: ${response.status}`);
-                    } catch (directError) {
-                        debugInfo.push(`❌ Direct fetch failed: ${directError.message}`);
-                    }
-                    
-                    throw new Error('All proxy attempts failed or returned empty content');
+                const jsonData = await response.json();
+                const htmlContent = jsonData.contents || jsonData.data || '';
+                
+                if (htmlContent.length < 100) {
+                    throw new Error('Received empty or invalid response');
                 }
                 
-                debugInfo.push(`🔍 First 200 chars: ${htmlContent.substring(0, 200)}...`);
+                const parseStartTime = performance.now();
+                debugInfo.push(`📄 Content length: ${htmlContent.length} characters`);
                 
-                // Check if we got actual HTML or an error page
-                if (htmlContent.includes('<html') || htmlContent.includes('<!DOCTYPE') || htmlContent.includes('<table')) {
-                    debugInfo.push(`✅ Valid HTML received`);
-                } else {
-                    debugInfo.push(`⚠️ Response doesn't look like HTML`);
-                    debugInfo.push(`📝 Full response preview: ${htmlContent.substring(0, 500)}`);
-                }
+                // Lightweight parsing for mobile
+                const courtData = parseCourtDataMobile(htmlContent);
                 
-                debugInfo.push(`🔧 Parsing court data...`);
-                const courtData = parseCourtData(htmlContent);
-                debugInfo.push(`📊 Raw Saturday slots: ${courtData.saturday.available.length}`);
-                debugInfo.push(`📊 Raw Sunday slots: ${courtData.sunday.available.length}`);
+                const parseTime = performance.now() - parseStartTime;
+                debugInfo.push(`🔧 Parsing completed in: ${Math.round(parseTime)}ms`);
                 
                 // Apply time filters
                 courtData.saturday.available = filterSlotsByTime(courtData.saturday.available);
                 courtData.sunday.available = filterSlotsByTime(courtData.sunday.available);
                 
-                debugInfo.push(`🎯 Filtered Saturday slots: ${courtData.saturday.available.length}`);
-                debugInfo.push(`🎯 Filtered Sunday slots: ${courtData.sunday.available.length}`);
+                const totalTime = performance.now() - startTime;
+                debugInfo.push(`⏱️ Total time: ${Math.round(totalTime)}ms`);
                 
                 displayResults(courtData);
                 updateLastChecked();
                 
-                // Show debug info in console
-                console.log('Debug Info:', debugInfo);
+                // Show performance info on mobile
+                if (window.innerWidth < 768) {
+                    console.log(`📱 Mobile performance: ${Math.round(totalTime)}ms total`);
+                }
                 
-                // Check if there are any available courts and send notifications
+                // Notifications (same as before)
                 const hasAvailable = courtData.saturday.available.length > 0 || courtData.sunday.available.length > 0;
                 if (hasAvailable) {
                     const totalSlots = courtData.saturday.available.length + courtData.sunday.available.length;
@@ -1109,12 +1059,10 @@
                     if (sunSlots > 0) notificationMessage += `Sunday: ${sunSlots} slot(s)\n`;
                     notificationMessage += `Book now: https://www.nycgovparks.org/tennisreservation/availability/12`;
                     
-                    // Sound notification
                     if (document.getElementById('soundNotifications').checked) {
                         playNotificationSound();
                     }
                     
-                    // Browser notification
                     if (document.getElementById('browserNotifications').checked && Notification.permission === 'granted') {
                         new Notification('Tennis Courts Available!', {
                             body: `${totalSlots} court slot(s) now available for this weekend.`,
@@ -1122,52 +1070,109 @@
                         });
                     }
                     
-                    // SMS notification
                     await sendSMS(notificationMessage);
                 }
                 
             } catch (error) {
-                debugInfo.push(`💥 Error: ${error.message}`);
-                debugInfo.push(`📍 Error stack: ${error.stack}`);
+                const totalTime = performance.now() - startTime;
+                debugInfo.push(`💥 Error after ${Math.round(totalTime)}ms: ${error.message}`);
                 
-                console.error('Full error details:', error);
-                console.log('Debug trace:', debugInfo);
+                console.error('Error details:', error);
+                console.log('Performance debug:', debugInfo);
                 
                 resultsDiv.innerHTML = `
                     <div class="status-card unavailable">
                         <h3>❌ Error Checking Availability</h3>
                         <p><strong>Error:</strong> ${error.message}</p>
-                        
-                        <div style="margin: 15px 0;">
-                            <button onclick="toggleDebugInfo()" style="background: #dc3545; min-width: auto; padding: 8px 16px;">
-                                Show Debug Info
-                            </button>
-                        </div>
-                        
-                        <div id="debugInfo" style="display: none; background: #f8f9fa; padding: 15px; border-radius: 5px; font-family: monospace; font-size: 12px; margin: 10px 0;">
-                            ${debugInfo.map(info => `<div>${info}</div>`).join('')}
-                        </div>
-                        
-                        <p><strong>Alternative solutions:</strong></p>
-                        <ul style="margin: 10px 0; padding-left: 20px;">
-                            <li><strong>Browser Extension:</strong> Install a CORS extension temporarily</li>
-                            <li><strong>Local Development:</strong> Run from localhost instead</li>
-                            <li><strong>Backend Service:</strong> Set up a simple proxy server</li>
-                            <li><strong>Manual Checking:</strong> Use the direct link below</li>
-                        </ul>
-                        
+                        <p style="font-size: 0.9em; color: #666;">
+                            ${window.innerWidth < 768 ? 'Mobile networks can be slower. ' : ''}
+                            Try again in a moment or check manually below.
+                        </p>
                         <p><strong>Manual check:</strong> <a href="https://www.nycgovparks.org/tennisreservation/availability/12" target="_blank">Central Park Tennis Reservations</a></p>
-                        
-                        <div style="margin-top: 15px; padding: 10px; background: #e8f4f8; border-radius: 5px; font-size: 0.9em;">
-                            <strong>💡 Technical Note:</strong> The issue is that modern browsers block cross-origin requests for security. 
-                            This is a fundamental limitation when trying to fetch external websites from a client-side application.
-                        </div>
                     </div>
                 `;
             }
             
             checkBtn.disabled = false;
             checkBtn.textContent = 'Check Now';
+        }
+        
+        // Lightweight mobile-optimized parsing
+        function parseCourtDataMobile(htmlContent) {
+            const dates = getWeekendDates();
+            const saturdayStr = dates.saturday.toLocaleDateString('en-US', { 
+                weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' 
+            });
+            const sundayStr = dates.sunday.toLocaleDateString('en-US', { 
+                weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' 
+            });
+            
+            const results = {
+                saturday: { available: [], date: saturdayStr },
+                sunday: { available: [], date: sundayStr }
+            };
+            
+            // Fast regex-based parsing instead of DOM parsing for mobile
+            const lines = htmlContent.split('\n');
+            let currentDay = '';
+            let isTargetWeekend = false;
+            
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
+                
+                // Check for date headers
+                if (line.includes('Saturday') || line.includes('Sunday')) {
+                    currentDay = '';
+                    isTargetWeekend = false;
+                    
+                    if (line.includes(saturdayStr)) {
+                        currentDay = 'saturday';
+                        isTargetWeekend = true;
+                    } else if (line.includes(sundayStr)) {
+                        currentDay = 'sunday';
+                        isTargetWeekend = true;
+                    }
+                }
+                
+                // Only process reserve links for target weekend
+                if (isTargetWeekend && line.includes('Reserve this time') && line.includes('/tennisreservation/reservecp/')) {
+                    // Quick regex extraction
+                    const timeMatch = line.match(/(\d{1,2}:\d{2}\s*[ap]\.?m\.?)/i);
+                    const linkMatch = line.match(/href="([^"]*tennisreservation\/reservecp\/[^"]*)"/);
+                    
+                    if (timeMatch && linkMatch) {
+                        // Simple court number extraction from context
+                        let courtNum = '19'; // default
+                        const courtMatch = line.match(/Court\s*(\d+)/i);
+                        if (courtMatch) {
+                            courtNum = courtMatch[1];
+                        } else {
+                            // Look in surrounding lines for court info
+                            for (let j = Math.max(0, i-3); j <= Math.min(lines.length-1, i+3); j++) {
+                                const contextMatch = lines[j].match(/Court\s*(\d+)/i);
+                                if (contextMatch) {
+                                    courtNum = contextMatch[1];
+                                    break;
+                                }
+                            }
+                        }
+                        
+                        const slot = {
+                            time: timeMatch[1],
+                            court: courtNum,
+                            link: linkMatch[1]
+                        };
+                        
+                        if (currentDay === 'saturday') {
+                            results.saturday.available.push(slot);
+                        } else if (currentDay === 'sunday') {
+                            results.sunday.available.push(slot);
+                        }
+                    }
+                }
+            }
+            
+            return results;
         }
         
         // Toggle debug info visibility
