@@ -967,38 +967,30 @@
             return results;
         }
         
-        // Check court availability with mobile optimization
+        // Check court availability - restored working version with mobile improvements
         async function checkAvailability() {
             const checkBtn = document.getElementById('checkBtn');
             const resultsDiv = document.getElementById('results');
             
             checkBtn.disabled = true;
             checkBtn.textContent = 'Checking...';
-            resultsDiv.innerHTML = '<div class="loading">⏳ Checking court availability...<br><small>This may take 10-20 seconds on mobile</small></div>';
             
-            // Performance tracking
-            const startTime = performance.now();
-            let debugInfo = [];
-            debugInfo.push(`🕐 Started at: ${new Date().toLocaleTimeString()}`);
+            // Show mobile-friendly loading message
+            const isMobile = window.innerWidth < 768;
+            resultsDiv.innerHTML = isMobile ? 
+                '<div class="loading">⏳ Checking court availability...<br><small>This may take 15-30 seconds on mobile</small></div>' :
+                '<div class="loading">Checking court availability...</div>';
             
             try {
-                // Use only the fastest proxy for mobile
-                const fastProxy = {
-                    name: 'AllOrigins (get)',
-                    url: 'https://api.allorigins.win/get?url=',
-                    type: 'json'
-                };
+                // Use the working proxy approach with timeout for mobile
+                const proxyUrl = 'https://api.allorigins.win/get?url=';
+                const targetUrl = encodeURIComponent('https://www.nycgovparks.org/tennisreservation/availability/12');
                 
-                const targetUrl = 'https://www.nycgovparks.org/tennisreservation/availability/12';
-                const fullUrl = fastProxy.url + encodeURIComponent(targetUrl);
-                
-                debugInfo.push(`🎯 Using fast proxy: ${fastProxy.name}`);
-                
-                // Set shorter timeout for mobile
+                // Add timeout for mobile to prevent hanging
                 const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 25000); // 25 second timeout
+                const timeoutId = setTimeout(() => controller.abort(), isMobile ? 35000 : 15000);
                 
-                const response = await fetch(fullUrl, {
+                const response = await fetch(proxyUrl + targetUrl, {
                     method: 'GET',
                     headers: {
                         'Accept': 'application/json'
@@ -1009,45 +1001,28 @@
                 
                 clearTimeout(timeoutId);
                 
-                const fetchTime = performance.now() - startTime;
-                debugInfo.push(`⚡ Fetch completed in: ${Math.round(fetchTime)}ms`);
-                
                 if (!response.ok) {
                     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                 }
                 
                 const jsonData = await response.json();
-                const htmlContent = jsonData.contents || jsonData.data || '';
+                const htmlContent = jsonData.contents || '';
                 
-                if (htmlContent.length < 100) {
+                if (!htmlContent || htmlContent.length < 100) {
                     throw new Error('Received empty or invalid response');
                 }
                 
-                const parseStartTime = performance.now();
-                debugInfo.push(`📄 Content length: ${htmlContent.length} characters`);
-                
-                // Lightweight parsing for mobile
-                const courtData = parseCourtDataMobile(htmlContent);
-                
-                const parseTime = performance.now() - parseStartTime;
-                debugInfo.push(`🔧 Parsing completed in: ${Math.round(parseTime)}ms`);
+                // Use the working parser
+                const courtData = parseCourtData(htmlContent);
                 
                 // Apply time filters
                 courtData.saturday.available = filterSlotsByTime(courtData.saturday.available);
                 courtData.sunday.available = filterSlotsByTime(courtData.sunday.available);
                 
-                const totalTime = performance.now() - startTime;
-                debugInfo.push(`⏱️ Total time: ${Math.round(totalTime)}ms`);
-                
                 displayResults(courtData);
                 updateLastChecked();
                 
-                // Show performance info on mobile
-                if (window.innerWidth < 768) {
-                    console.log(`📱 Mobile performance: ${Math.round(totalTime)}ms total`);
-                }
-                
-                // Notifications (same as before)
+                // Check if there are any available courts and send notifications
                 const hasAvailable = courtData.saturday.available.length > 0 || courtData.sunday.available.length > 0;
                 if (hasAvailable) {
                     const totalSlots = courtData.saturday.available.length + courtData.sunday.available.length;
@@ -1059,10 +1034,12 @@
                     if (sunSlots > 0) notificationMessage += `Sunday: ${sunSlots} slot(s)\n`;
                     notificationMessage += `Book now: https://www.nycgovparks.org/tennisreservation/availability/12`;
                     
+                    // Sound notification
                     if (document.getElementById('soundNotifications').checked) {
                         playNotificationSound();
                     }
                     
+                    // Browser notification
                     if (document.getElementById('browserNotifications').checked && Notification.permission === 'granted') {
                         new Notification('Tennis Courts Available!', {
                             body: `${totalSlots} court slot(s) now available for this weekend.`,
@@ -1070,24 +1047,32 @@
                         });
                     }
                     
+                    // SMS notification
                     await sendSMS(notificationMessage);
                 }
                 
             } catch (error) {
-                const totalTime = performance.now() - startTime;
-                debugInfo.push(`💥 Error after ${Math.round(totalTime)}ms: ${error.message}`);
+                console.error('Error checking availability:', error);
                 
-                console.error('Error details:', error);
-                console.log('Performance debug:', debugInfo);
+                // More helpful error messages
+                let errorMessage = error.message;
+                if (error.name === 'AbortError') {
+                    errorMessage = isMobile ? 
+                        'Request timed out. Mobile networks can be slower - try again in a moment.' :
+                        'Request timed out. Try again in a moment.';
+                } else if (errorMessage.includes('Content-Length')) {
+                    errorMessage = 'Network response error. Try again in a moment.';
+                } else if (errorMessage.includes('Load Failed')) {
+                    errorMessage = isMobile ? 
+                        'Network connection failed. Check your mobile connection and try again.' :
+                        'Network connection failed. Check your connection and try again.';
+                }
                 
                 resultsDiv.innerHTML = `
                     <div class="status-card unavailable">
                         <h3>❌ Error Checking Availability</h3>
-                        <p><strong>Error:</strong> ${error.message}</p>
-                        <p style="font-size: 0.9em; color: #666;">
-                            ${window.innerWidth < 768 ? 'Mobile networks can be slower. ' : ''}
-                            Try again in a moment or check manually below.
-                        </p>
+                        <p><strong>Error:</strong> ${errorMessage}</p>
+                        ${isMobile ? '<p style="font-size: 0.9em; color: #666;">Mobile networks can be slower and less reliable for this type of request.</p>' : ''}
                         <p><strong>Manual check:</strong> <a href="https://www.nycgovparks.org/tennisreservation/availability/12" target="_blank">Central Park Tennis Reservations</a></p>
                     </div>
                 `;
@@ -1095,84 +1080,6 @@
             
             checkBtn.disabled = false;
             checkBtn.textContent = 'Check Now';
-        }
-        
-        // Lightweight mobile-optimized parsing
-        function parseCourtDataMobile(htmlContent) {
-            const dates = getWeekendDates();
-            const saturdayStr = dates.saturday.toLocaleDateString('en-US', { 
-                weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' 
-            });
-            const sundayStr = dates.sunday.toLocaleDateString('en-US', { 
-                weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' 
-            });
-            
-            const results = {
-                saturday: { available: [], date: saturdayStr },
-                sunday: { available: [], date: sundayStr }
-            };
-            
-            // Fast regex-based parsing instead of DOM parsing for mobile
-            const lines = htmlContent.split('\n');
-            let currentDay = '';
-            let isTargetWeekend = false;
-            
-            for (let i = 0; i < lines.length; i++) {
-                const line = lines[i];
-                
-                // Check for date headers
-                if (line.includes('Saturday') || line.includes('Sunday')) {
-                    currentDay = '';
-                    isTargetWeekend = false;
-                    
-                    if (line.includes(saturdayStr)) {
-                        currentDay = 'saturday';
-                        isTargetWeekend = true;
-                    } else if (line.includes(sundayStr)) {
-                        currentDay = 'sunday';
-                        isTargetWeekend = true;
-                    }
-                }
-                
-                // Only process reserve links for target weekend
-                if (isTargetWeekend && line.includes('Reserve this time') && line.includes('/tennisreservation/reservecp/')) {
-                    // Quick regex extraction
-                    const timeMatch = line.match(/(\d{1,2}:\d{2}\s*[ap]\.?m\.?)/i);
-                    const linkMatch = line.match(/href="([^"]*tennisreservation\/reservecp\/[^"]*)"/);
-                    
-                    if (timeMatch && linkMatch) {
-                        // Simple court number extraction from context
-                        let courtNum = '19'; // default
-                        const courtMatch = line.match(/Court\s*(\d+)/i);
-                        if (courtMatch) {
-                            courtNum = courtMatch[1];
-                        } else {
-                            // Look in surrounding lines for court info
-                            for (let j = Math.max(0, i-3); j <= Math.min(lines.length-1, i+3); j++) {
-                                const contextMatch = lines[j].match(/Court\s*(\d+)/i);
-                                if (contextMatch) {
-                                    courtNum = contextMatch[1];
-                                    break;
-                                }
-                            }
-                        }
-                        
-                        const slot = {
-                            time: timeMatch[1],
-                            court: courtNum,
-                            link: linkMatch[1]
-                        };
-                        
-                        if (currentDay === 'saturday') {
-                            results.saturday.available.push(slot);
-                        } else if (currentDay === 'sunday') {
-                            results.sunday.available.push(slot);
-                        }
-                    }
-                }
-            }
-            
-            return results;
         }
         
         // Toggle debug info visibility
