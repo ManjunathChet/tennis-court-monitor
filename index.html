@@ -967,7 +967,7 @@
             return results;
         }
         
-        // Check court availability - restored working version with mobile improvements
+        // Check court availability - working version with fallback proxies
         async function checkAvailability() {
             const checkBtn = document.getElementById('checkBtn');
             const resultsDiv = document.getElementById('results');
@@ -982,35 +982,76 @@
                 '<div class="loading">Checking court availability...</div>';
             
             try {
-                // Use the working proxy approach with timeout for mobile
-                const proxyUrl = 'https://api.allorigins.win/get?url=';
-                const targetUrl = encodeURIComponent('https://www.nycgovparks.org/tennisreservation/availability/12');
-                
-                // Add timeout for mobile to prevent hanging
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), isMobile ? 35000 : 15000);
-                
-                const response = await fetch(proxyUrl + targetUrl, {
-                    method: 'GET',
-                    headers: {
-                        'Accept': 'application/json'
+                // Try multiple working proxy services
+                const proxies = [
+                    {
+                        name: 'AllOrigins JSON',
+                        url: 'https://api.allorigins.win/get?url=',
+                        type: 'json'
                     },
-                    signal: controller.signal,
-                    mode: 'cors'
-                });
+                    {
+                        name: 'AllOrigins Raw',
+                        url: 'https://api.allorigins.win/raw?url=',
+                        type: 'text'
+                    },
+                    {
+                        name: 'ThingProxy',
+                        url: 'https://thingproxy.freeboard.io/fetch/',
+                        type: 'text'
+                    }
+                ];
                 
-                clearTimeout(timeoutId);
+                const targetUrl = 'https://www.nycgovparks.org/tennisreservation/availability/12';
+                let htmlContent = '';
+                let successProxy = '';
                 
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                for (const proxy of proxies) {
+                    try {
+                        console.log(`Trying ${proxy.name}...`);
+                        
+                        const controller = new AbortController();
+                        const timeoutId = setTimeout(() => controller.abort(), isMobile ? 35000 : 15000);
+                        
+                        const response = await fetch(proxy.url + encodeURIComponent(targetUrl), {
+                            method: 'GET',
+                            headers: {
+                                'Accept': proxy.type === 'json' ? 'application/json' : 'text/html'
+                            },
+                            signal: controller.signal,
+                            mode: 'cors'
+                        });
+                        
+                        clearTimeout(timeoutId);
+                        
+                        if (response.ok) {
+                            if (proxy.type === 'json') {
+                                const jsonData = await response.json();
+                                htmlContent = jsonData.contents || jsonData.data || '';
+                            } else {
+                                htmlContent = await response.text();
+                            }
+                            
+                            if (htmlContent && htmlContent.length > 1000) {
+                                console.log(`✅ Success with ${proxy.name}`);
+                                successProxy = proxy.name;
+                                break;
+                            } else {
+                                console.log(`⚠️ ${proxy.name} returned short response: ${htmlContent.length} chars`);
+                            }
+                        } else {
+                            console.log(`❌ ${proxy.name} failed: ${response.status} ${response.statusText}`);
+                        }
+                    } catch (proxyError) {
+                        console.log(`❌ ${proxy.name} error:`, proxyError.message);
+                        continue;
+                    }
                 }
                 
-                const jsonData = await response.json();
-                const htmlContent = jsonData.contents || '';
-                
-                if (!htmlContent || htmlContent.length < 100) {
-                    throw new Error('Received empty or invalid response');
+                if (!htmlContent || htmlContent.length < 1000) {
+                    throw new Error('All proxy services failed or returned invalid data. The proxy services may be temporarily unavailable.');
                 }
+                
+                console.log(`Using content from ${successProxy}, length: ${htmlContent.length}`);
                 
                 // Use the working parser
                 const courtData = parseCourtData(htmlContent);
@@ -1060,19 +1101,20 @@
                     errorMessage = isMobile ? 
                         'Request timed out. Mobile networks can be slower - try again in a moment.' :
                         'Request timed out. Try again in a moment.';
-                } else if (errorMessage.includes('Content-Length')) {
-                    errorMessage = 'Network response error. Try again in a moment.';
-                } else if (errorMessage.includes('Load Failed')) {
-                    errorMessage = isMobile ? 
-                        'Network connection failed. Check your mobile connection and try again.' :
-                        'Network connection failed. Check your connection and try again.';
+                } else if (errorMessage.includes('NetworkError') || errorMessage.includes('fetch')) {
+                    errorMessage = 'Proxy services are temporarily unavailable. This is a known limitation of browser-based tools.';
                 }
                 
                 resultsDiv.innerHTML = `
                     <div class="status-card unavailable">
                         <h3>❌ Error Checking Availability</h3>
                         <p><strong>Error:</strong> ${errorMessage}</p>
-                        ${isMobile ? '<p style="font-size: 0.9em; color: #666;">Mobile networks can be slower and less reliable for this type of request.</p>' : ''}
+                        ${errorMessage.includes('Proxy services') ? `
+                            <div style="margin: 15px 0; padding: 10px; background: #e8f4f8; border-radius: 5px; font-size: 0.9em;">
+                                <strong>💡 Why this happens:</strong> Browser security prevents direct access to external websites. 
+                                We rely on proxy services that sometimes go down. Try again in a few minutes.
+                            </div>
+                        ` : ''}
                         <p><strong>Manual check:</strong> <a href="https://www.nycgovparks.org/tennisreservation/availability/12" target="_blank">Central Park Tennis Reservations</a></p>
                     </div>
                 `;
