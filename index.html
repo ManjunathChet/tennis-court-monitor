@@ -333,6 +333,32 @@
             margin-top: 20px;
         }
         
+        .court-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+            font-size: 14px;
+        }
+        
+        .court-table th, .court-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: center;
+        }
+        
+        .court-table th {
+            background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
+            color: white;
+            font-weight: bold;
+            padding: 12px 8px;
+        }
+        
+        .available-slot {
+            background: linear-gradient(145deg, #d4edda 0%, #c3e6cb 100%);
+            color: #155724;
+            font-weight: bold;
+        }
+        
         @media (max-width: 768px) {
             .container {
                 padding: 10px;
@@ -693,12 +719,261 @@
                 weekendLabel + ': ' + dates.saturdayFormatted + ' & ' + dates.sundayFormatted;
         }
         
+        // Filter slots based on time preferences
+        function filterSlotsByTime(slots) {
+            var morningEnabled = document.getElementById('morningFilter').checked;
+            var eveningEnabled = document.getElementById('eveningFilter').checked;
+            
+            if (!morningEnabled && !eveningEnabled) {
+                return [];
+            }
+            
+            var filteredSlots = [];
+            for (var i = 0; i < slots.length; i++) {
+                var slot = slots[i];
+                var timeStr = slot.time.toLowerCase();
+                var hour = parseInt(timeStr.split(':')[0]);
+                var isPM = timeStr.indexOf('p') !== -1;
+                
+                if (isPM && hour !== 12) {
+                    hour += 12;
+                } else if (!isPM && hour === 12) {
+                    hour = 0;
+                }
+                
+                var isMorning = hour < 13;
+                var isEvening = hour >= 13;
+                
+                if ((morningEnabled && isMorning) || (eveningEnabled && isEvening)) {
+                    filteredSlots.push(slot);
+                }
+            }
+            return filteredSlots;
+        }
+        
+        // Parse court data from HTML content
+        function parseCourtData(htmlContent, parkId) {
+            console.log('🔍 Parsing data for park ' + parkId);
+            
+            var dates = getWeekendDates();
+            var saturdayStr = dates.saturday.toLocaleDateString('en-US', { 
+                weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' 
+            });
+            var sundayStr = dates.sunday.toLocaleDateString('en-US', { 
+                weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' 
+            });
+            
+            console.log('📅 Target dates: "' + saturdayStr + '" and "' + sundayStr + '"');
+            
+            var park = null;
+            for (var i = 0; i < nycParks.length; i++) {
+                if (nycParks[i].id === parkId) {
+                    park = nycParks[i];
+                    break;
+                }
+            }
+            
+            var results = {
+                parkName: park ? park.name : 'Park ' + parkId,
+                saturday: { available: [], date: saturdayStr },
+                sunday: { available: [], date: sundayStr }
+            };
+            
+            // Check if we have valid HTML content
+            if (!htmlContent || htmlContent.length < 1000) {
+                console.log('❌ Invalid or short HTML content for park ' + parkId);
+                return results;
+            }
+            
+            // Split HTML into lines and process
+            var lines = htmlContent.split('\n');
+            var currentDateSection = '';
+            var inTargetSaturday = false;
+            var inTargetSunday = false;
+            
+            for (var i = 0; i < lines.length; i++) {
+                var line = lines[i].trim();
+                
+                // Look for date headers
+                if (line.indexOf('Saturday') !== -1 && line.indexOf('2025') !== -1) {
+                    currentDateSection = line;
+                    inTargetSaturday = line.indexOf(saturdayStr) !== -1;
+                    inTargetSunday = false;
+                    console.log('📅 Found Saturday line: "' + line.substring(0, 50) + '" -> Target: ' + inTargetSaturday);
+                } else if (line.indexOf('Sunday') !== -1 && line.indexOf('2025') !== -1) {
+                    currentDateSection = line;
+                    inTargetSunday = line.indexOf(sundayStr) !== -1;
+                    inTargetSaturday = false;
+                    console.log('📅 Found Sunday line: "' + line.substring(0, 50) + '" -> Target: ' + inTargetSunday);
+                }
+                
+                // Only process Reserve links when we're in the right date section
+                if ((inTargetSaturday || inTargetSunday) && 
+                    line.indexOf('Reserve this time') !== -1 && 
+                    line.indexOf('/tennisreservation/reservecp/') !== -1) {
+                    
+                    // Extract time from the line or surrounding lines
+                    var timeMatch = line.match(/(\d{1,2}:\d{2}\s*[ap]\.?m\.?)/i);
+                    
+                    // If no time in current line, look in previous lines
+                    if (!timeMatch) {
+                        for (var j = Math.max(0, i - 3); j < i; j++) {
+                            timeMatch = lines[j].match(/(\d{1,2}:\d{2}\s*[ap]\.?m\.?)/i);
+                            if (timeMatch) break;
+                        }
+                    }
+                    
+                    var linkMatch = line.match(/href="([^"]*tennisreservation\/reservecp\/[^"]*)"/);
+                    
+                    if (timeMatch && linkMatch) {
+                        // Extract court number
+                        var courtNum = 'Unknown';
+                        var courtMatch = line.match(/Court\s*(\d+)/i);
+                        if (courtMatch) {
+                            courtNum = courtMatch[1];
+                        } else {
+                            // Look in surrounding lines for court info
+                            for (var k = Math.max(0, i - 2); k <= Math.min(lines.length - 1, i + 2); k++) {
+                                var surroundingCourtMatch = lines[k].match(/Court\s*(\d+)/i);
+                                if (surroundingCourtMatch) {
+                                    courtNum = surroundingCourtMatch[1];
+                                    break;
+                                }
+                            }
+                        }
+                        
+                        var slot = {
+                            time: timeMatch[1],
+                            court: courtNum,
+                            link: linkMatch[1],
+                            park: results.parkName
+                        };
+                        
+                        if (inTargetSaturday) {
+                            results.saturday.available.push(slot);
+                            console.log('➕ Added to Saturday: ' + slot.time + ' Court ' + slot.court);
+                        } else if (inTargetSunday) {
+                            results.sunday.available.push(slot);
+                            console.log('➕ Added to Sunday: ' + slot.time + ' Court ' + slot.court);
+                        }
+                    }
+                }
+            }
+            
+            console.log('📊 Final results for ' + results.parkName + ': Saturday=' + results.saturday.available.length + ', Sunday=' + results.sunday.available.length);
+            return results;
+        }
+        
+        // Display results for all parks
+        function displayAllResults(allResults) {
+            var resultsDiv = document.getElementById('results');
+            
+            var totalAvailable = 0;
+            for (var i = 0; i < allResults.length; i++) {
+                totalAvailable += allResults[i].saturday.available.length + allResults[i].sunday.available.length;
+            }
+            
+            var morningEnabled = document.getElementById('morningFilter').checked;
+            var eveningEnabled = document.getElementById('eveningFilter').checked;
+            
+            var timeFilterText = '';
+            if (morningEnabled && eveningEnabled) {
+                timeFilterText = ' (all times)';
+            } else if (morningEnabled) {
+                timeFilterText = ' (morning slots only)';
+            } else if (eveningEnabled) {
+                timeFilterText = ' (afternoon/evening slots only)';
+            } else {
+                timeFilterText = ' (no time filters selected)';
+            }
+            
+            var html = '';
+            
+            if (totalAvailable === 0) {
+                html = 
+                    '<div class="status-card unavailable">' +
+                        '<h3>❌ No Courts Available</h3>' +
+                        '<p>No courts are currently available for reservation this weekend' + timeFilterText + ' at your selected parks.</p>' +
+                    '</div>';
+                
+                // Show status for each park
+                for (var i = 0; i < allResults.length; i++) {
+                    var park = allResults[i];
+                    html += 
+                        '<div class="status-card">' +
+                            '<h4>' + park.parkName + '</h4>' +
+                            '<p><strong>Saturday:</strong> ' + park.saturday.date + ' - No matching slots</p>' +
+                            '<p><strong>Sunday:</strong> ' + park.sunday.date + ' - No matching slots</p>' +
+                        '</div>';
+                }
+            } else {
+                html = 
+                    '<div class="status-card available">' +
+                        '<h3>✅ Courts Available!</h3>' +
+                        '<p><strong>' + totalAvailable + '</strong> court slot(s) available this weekend' + timeFilterText + '!</p>' +
+                    '</div>';
+                
+                // Show results for each park with available courts
+                for (var i = 0; i < allResults.length; i++) {
+                    var park = allResults[i];
+                    var parkTotal = park.saturday.available.length + park.sunday.available.length;
+                    if (parkTotal > 0) {
+                        html += '<div class="status-card"><h4>' + park.parkName + ' (' + parkTotal + ' slots)</h4>';
+                        
+                        // Saturday results
+                        if (park.saturday.available.length > 0) {
+                            html += 
+                                '<h5>Saturday - ' + park.saturday.date + ' (' + park.saturday.available.length + ' slots)</h5>' +
+                                '<table class="court-table">' +
+                                    '<tr><th>Time</th><th>Court</th><th>Action</th></tr>';
+                            
+                            for (var j = 0; j < park.saturday.available.length; j++) {
+                                var slot = park.saturday.available[j];
+                                html += 
+                                    '<tr class="available-slot">' +
+                                        '<td>' + slot.time + '</td>' +
+                                        '<td>Court ' + slot.court + '</td>' +
+                                        '<td><a href="https://www.nycgovparks.org' + slot.link + '" target="_blank">Reserve Now</a></td>' +
+                                    '</tr>';
+                            }
+                            html += '</table>';
+                        }
+                        
+                        // Sunday results
+                        if (park.sunday.available.length > 0) {
+                            html += 
+                                '<h5>Sunday - ' + park.sunday.date + ' (' + park.sunday.available.length + ' slots)</h5>' +
+                                '<table class="court-table">' +
+                                    '<tr><th>Time</th><th>Court</th><th>Action</th></tr>';
+                            
+                            for (var j = 0; j < park.sunday.available.length; j++) {
+                                var slot = park.sunday.available[j];
+                                html += 
+                                    '<tr class="available-slot">' +
+                                        '<td>' + slot.time + '</td>' +
+                                        '<td>Court ' + slot.court + '</td>' +
+                                        '<td><a href="https://www.nycgovparks.org' + slot.link + '" target="_blank">Reserve Now</a></td>' +
+                                    '</tr>';
+                            }
+                            html += '</table>';
+                        }
+                        
+                        html += '</div>';
+                    }
+                }
+            }
+            
+            resultsDiv.innerHTML = html;
+        }
+        
         // Check court availability
         function checkAvailability() {
-            var selectedParkIds = getSelectedParkIds();
+            var checkBtn = document.getElementById('checkBtn');
+            var resultsDiv = document.getElementById('results');
             
+            var selectedParkIds = getSelectedParkIds();
             if (selectedParkIds.length === 0) {
-                document.getElementById('results').innerHTML = 
+                resultsDiv.innerHTML = 
                     '<div class="status-card unavailable">' +
                         '<h3>⚠️ No Parks Selected</h3>' +
                         '<p>Please select at least one park to monitor from the list above.</p>' +
@@ -706,32 +981,83 @@
                 return;
             }
             
-            var morningEnabled = document.getElementById('morningFilter').checked;
-            var eveningEnabled = document.getElementById('eveningFilter').checked;
-            var timeFilterText = '';
+            checkBtn.disabled = true;
+            checkBtn.textContent = 'Checking...';
+            resultsDiv.innerHTML = '<div class="loading">Checking court availability across selected parks...</div>';
             
-            if (morningEnabled && eveningEnabled) {
-                timeFilterText = ' (monitoring all times)';
-            } else if (morningEnabled) {
-                timeFilterText = ' (monitoring morning slots only)';
-            } else if (eveningEnabled) {
-                timeFilterText = ' (monitoring afternoon/evening slots only)';
-            } else {
-                timeFilterText = ' (no time filters selected)';
+            console.log('🔍 Starting availability check for ' + selectedParkIds.length + ' parks');
+            
+            var BACKEND_PROXY_URL = 'https://tennis-court-monitor.vercel.app/api/proxy';
+            var allResults = [];
+            var completed = 0;
+            
+            // Check each selected park
+            for (var i = 0; i < selectedParkIds.length; i++) {
+                var parkId = selectedParkIds[i];
+                checkSinglePark(parkId, BACKEND_PROXY_URL, function(parkResult) {
+                    if (parkResult) {
+                        allResults.push(parkResult);
+                    }
+                    completed++;
+                    
+                    // When all parks are checked
+                    if (completed === selectedParkIds.length) {
+                        console.log('✅ Completed checking all parks');
+                        displayAllResults(allResults);
+                        updateLastChecked();
+                        
+                        checkBtn.disabled = false;
+                        checkBtn.textContent = 'Check Now';
+                    }
+                });
             }
+        }
+        
+        // Check a single park
+        function checkSinglePark(parkId, proxyUrl, callback) {
+            console.log('🔍 Checking park ' + parkId);
             
-            document.getElementById('results').innerHTML = 
-                '<div class="status-card">' +
-                    '<h3>🔧 System Status</h3>' +
-                    '<p>✅ Successfully loaded ' + selectedParkIds.length + ' selected park(s)</p>' +
-                    '<p>✅ Weekend dates calculated correctly</p>' +
-                    '<p>✅ Time filters configured' + timeFilterText + '</p>' +
-                    '<p>✅ Auto-refresh ' + (isAutoRefreshing ? 'ACTIVE' : 'ready') + '</p>' +
-                    '<p>🔧 Backend connectivity and court parsing are being finalized</p>' +
-                    '<p><strong>Manual check:</strong> <a href="https://www.nycgovparks.org/tennisreservation" target="_blank">NYC Parks Tennis Reservations</a></p>' +
-                '</div>';
+            var xhr = new XMLHttpRequest();
+            xhr.open('GET', proxyUrl + '?parkId=' + parkId, true);
+            xhr.setRequestHeader('Accept', 'application/json');
             
-            updateLastChecked();
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === 4) {
+                    if (xhr.status === 200) {
+                        try {
+                            var jsonData = JSON.parse(xhr.responseText);
+                            var htmlContent = jsonData.contents || '';
+                            
+                            if (htmlContent && htmlContent.length > 1000) {
+                                var courtData = parseCourtData(htmlContent, parkId);
+                                
+                                // Apply time filters
+                                courtData.saturday.available = filterSlotsByTime(courtData.saturday.available);
+                                courtData.sunday.available = filterSlotsByTime(courtData.sunday.available);
+                                
+                                console.log('✅ Successfully parsed park ' + parkId);
+                                callback(courtData);
+                            } else {
+                                console.log('❌ No valid content for park ' + parkId);
+                                callback(null);
+                            }
+                        } catch (error) {
+                            console.error('❌ Error parsing response for park ' + parkId + ':', error);
+                            callback(null);
+                        }
+                    } else {
+                        console.error('❌ HTTP error for park ' + parkId + ': ' + xhr.status);
+                        callback(null);
+                    }
+                }
+            };
+            
+            xhr.onerror = function() {
+                console.error('❌ Network error for park ' + parkId);
+                callback(null);
+            };
+            
+            xhr.send();
         }
         
         // Update last checked time
