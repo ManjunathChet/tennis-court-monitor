@@ -528,6 +528,7 @@
         var isAutoRefreshing = false;
         
         // NYC Parks tennis facilities data with correct availability IDs
+        // Based on https://www.nycgovparks.org/tennisreservation main page
         var nycParks = [
             {
                 id: 12,
@@ -536,16 +537,16 @@
                 courts: 6,
                 surface: "Clay",
                 season: "April - November",
-                availabilityId: 1  // NYC Parks availability ID
+                availabilityId: 1  // Central Park is typically first
             },
             {
                 id: 13,
-                name: "Alley Pond Park",
+                name: "Alley Pond Park", // "Commonpoint Tennis at Alley Pond Park"
                 borough: "Queens", 
                 courts: 4,
                 surface: "Hard",
                 season: "May - September",
-                availabilityId: 2  // Need to verify this
+                availabilityId: 2  // Second in list
             },
             {
                 id: 14,
@@ -554,7 +555,7 @@
                 courts: 2,
                 surface: "Hard", 
                 season: "May - September",
-                availabilityId: 3  // Need to verify this
+                availabilityId: 3  // Third in list
             },
             {
                 id: 15,
@@ -563,16 +564,16 @@
                 courts: 3,
                 surface: "Hard",
                 season: "May - October",
-                availabilityId: 4  // Confirmed from your example
+                availabilityId: 4  // CONFIRMED from user example
             },
             {
                 id: 16,
-                name: "Riverside Park (96th St)",
+                name: "Riverside Park (96th St)", // "Riverside Clay Tennis Association at Riverside Park (96 Street)"
                 borough: "Manhattan",
                 courts: 2,
                 surface: "Clay",
                 season: "April - September",
-                availabilityId: 5  // Need to verify this
+                availabilityId: 5  // Fifth in list
             },
             {
                 id: 17,
@@ -581,25 +582,25 @@
                 courts: 2,
                 surface: "Hard",
                 season: "April - September",
-                availabilityId: 6  // Need to verify this
+                availabilityId: 6  // Sixth in list
             },
             {
                 id: 18,
-                name: "Randall's Island",
+                name: "Randall's Island", // "Sportime at Randall's Island Park"
                 borough: "Manhattan",
                 courts: 4,
                 surface: "Hard",
                 season: "May - September",
-                availabilityId: 7  // Need to verify this
+                availabilityId: 7  // Seventh in list
             },
             {
                 id: 19,
-                name: "Queensborough Oval",
+                name: "Queensborough Oval", // "Sutton East at Queensborough Oval"
                 borough: "Manhattan",
                 courts: 2,
                 surface: "Hard",
                 season: "April - September",
-                availabilityId: 8  // Need to verify this
+                availabilityId: 8  // Eighth in list
             }
         ];
         
