@@ -1,10 +1,12 @@
-# 🎾 Central Park Tennis Court Monitor
+# 🎾 Central Park Weekend Tennis
 
 Monitors NYC Parks for Central Park tennis court availability and sends SMS notifications.
 
+**🌐 Live Tool:** https://tennis-court-monitor.vercel.app/
+
 ## Quick Setup
 
-1. **Access**: Visit the hosted page at `https://manjunathchet.github.io/tennis-court-monitor`
+1. **Access**: Visit https://tennis-court-monitor.vercel.app/
 2. **Check**: Click "Check Now" to see current weekend availability
 3. **SMS Setup** (optional):
    - Sign up at [twilio.com](https://www.twilio.com)
@@ -22,9 +24,21 @@ Monitors NYC Parks for Central Park tennis court availability and sends SMS noti
 - Sends notifications when courts become available
 - Links directly to NYC Parks reservation system
 
+## Performance
+
+- **Desktop**: 2-3 second response times
+- **Mobile**: 3-5 second response times
+- **Backend**: Serverless proxy via Vercel for optimal speed
+
+## SMS Costs
+
+- ~$0.75 per 100 SMS messages
+- $1/month for Twilio phone number
+- Free tier available for testing
+
 ## Twilio Phone Number Setup
 
-When provisioning a Twilio phone number, use this GitHub Pages URL as the "Website URL" - it contains all required SMS compliance information.
+When provisioning a Twilio phone number, use `https://tennis-court-monitor.vercel.app/` as the "Website URL" - it contains all required SMS compliance information.
 
 ## Settings
 
@@ -35,7 +49,7 @@ When provisioning a Twilio phone number, use this GitHub Pages URL as the "Websi
 ## Data Privacy
 
 - All settings stored locally in your browser
-- Phone number never saved to GitHub repo
+- Phone number never saved to any repository
 - Only you can see your personal configuration
 
 ## Troubleshooting
@@ -43,6 +57,12 @@ When provisioning a Twilio phone number, use this GitHub Pages URL as the "Websi
 - **No courts found**: Try different time filters or check manually
 - **SMS not working**: Verify Twilio credentials and account funding
 - **Errors**: Keep browser tab open, check internet connection
+
+## Technical Stack
+
+- **Frontend**: Hosted on Vercel (static site)
+- **Backend**: Vercel serverless functions for CORS proxy
+- **Original**: GitHub repository for code storage
 
 ---
 
