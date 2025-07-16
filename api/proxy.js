@@ -9,7 +9,10 @@ export default async function handler(req, res) {
   }
 
   try {
-    const response = await fetch('https://www.nycgovparks.org/tennisreservation/availability/12', {
+    // Get park ID from query parameter, default to Central Park (12)
+    const parkId = req.query.parkId || '12';
+    
+    const response = await fetch(`https://www.nycgovparks.org/tennisreservation/availability/${parkId}`, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
       }
