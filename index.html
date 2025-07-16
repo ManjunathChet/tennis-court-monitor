@@ -528,7 +528,7 @@
         var isAutoRefreshing = false;
         
         // NYC Parks tennis facilities data with correct availability IDs
-        // Based on https://www.nycgovparks.org/tennisreservation main page
+        // Testing different mapping based on actual results
         var nycParks = [
             {
                 id: 12,
@@ -537,7 +537,7 @@
                 courts: 6,
                 surface: "Clay",
                 season: "April - November",
-                availabilityId: 1  // Central Park is typically first
+                availabilityId: 1  // Most likely first
             },
             {
                 id: 13,
@@ -546,7 +546,7 @@
                 courts: 4,
                 surface: "Hard",
                 season: "May - September",
-                availabilityId: 2  // Second in list
+                availabilityId: 7  // TESTING: Randall's was showing Alley Pond, so swap them
             },
             {
                 id: 14,
@@ -555,7 +555,7 @@
                 courts: 2,
                 surface: "Hard", 
                 season: "May - September",
-                availabilityId: 3  // Third in list
+                availabilityId: 3  // Keep same for now
             },
             {
                 id: 15,
@@ -564,7 +564,7 @@
                 courts: 3,
                 surface: "Hard",
                 season: "May - October",
-                availabilityId: 4  // CONFIRMED from user example
+                availabilityId: 4  // CONFIRMED working
             },
             {
                 id: 16,
@@ -573,7 +573,7 @@
                 courts: 2,
                 surface: "Clay",
                 season: "April - September",
-                availabilityId: 5  // Fifth in list
+                availabilityId: 5  // Keep same for now
             },
             {
                 id: 17,
@@ -582,7 +582,7 @@
                 courts: 2,
                 surface: "Hard",
                 season: "April - September",
-                availabilityId: 6  // Sixth in list
+                availabilityId: 6  // Keep same for now
             },
             {
                 id: 18,
@@ -591,7 +591,7 @@
                 courts: 4,
                 surface: "Hard",
                 season: "May - September",
-                availabilityId: 7  // Seventh in list
+                availabilityId: 2  // TESTING: If Alley Pond was 7, try 2 for Randall's
             },
             {
                 id: 19,
@@ -600,7 +600,7 @@
                 courts: 2,
                 surface: "Hard",
                 season: "April - September",
-                availabilityId: 8  // Eighth in list
+                availabilityId: 8  // Keep same for now
             }
         ];
         
