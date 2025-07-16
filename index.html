@@ -1,4 +1,533 @@
-// NYC Parks tennis facilities data with correct availability IDs
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NYC Parks Weekend Tennis</title>
+    <meta name="description" content="Monitor all NYC Parks tennis court availability and receive SMS notifications when courts become available.">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #2c3e50;
+            background: linear-gradient(135deg, #27ae60 0%, #2ecc71 50%, #52c86a 100%);
+            min-height: 100vh;
+            position: relative;
+        }
+        
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-image: 
+                radial-gradient(circle at 20% 20%, rgba(46, 204, 113, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(39, 174, 96, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 40% 40%, rgba(82, 200, 106, 0.05) 0%, transparent 50%);
+            pointer-events: none;
+        }
+        
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .hero {
+            text-align: center;
+            background: linear-gradient(145deg, #ffffff 0%, #f8fffe 100%);
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 
+                0 20px 60px rgba(39, 174, 96, 0.15),
+                0 0 0 1px rgba(39, 174, 96, 0.1);
+            margin-bottom: 30px;
+            border-top: 4px solid #27ae60;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(39, 174, 96, 0.03) 0%, transparent 70%);
+            pointer-events: none;
+        }
+        
+        .hero h1 {
+            font-size: 2.8em;
+            margin-bottom: 15px;
+            background: linear-gradient(135deg, #27ae60 0%, #2ecc71 50%, #229954 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-weight: 700;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            position: relative;
+        }
+        
+        .hero .subtitle {
+            font-size: 1.2em;
+            color: #34495e;
+            margin-bottom: 20px;
+            font-weight: 500;
+        }
+        
+        .tennis-icon {
+            font-size: 3em;
+            margin-bottom: 15px;
+            display: block;
+            animation: bounce 2s infinite;
+        }
+        
+        @keyframes bounce {
+            0%, 20%, 50%, 80%, 100% {
+                transform: translateY(0);
+            }
+            40% {
+                transform: translateY(-10px);
+            }
+            60% {
+                transform: translateY(-5px);
+            }
+        }
+        
+        .nyc-badge {
+            display: inline-block;
+            background: linear-gradient(135deg, #27ae60, #2ecc71);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: bold;
+            margin: 10px 0;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            box-shadow: 0 4px 12px rgba(39, 174, 96, 0.3);
+        }
+        
+        .nav-tabs {
+            display: flex;
+            background: linear-gradient(145deg, #ffffff 0%, #f8fffe 100%);
+            border-radius: 15px;
+            padding: 10px;
+            margin-bottom: 20px;
+            box-shadow: 
+                0 10px 30px rgba(39, 174, 96, 0.1),
+                0 0 0 1px rgba(39, 174, 96, 0.1);
+            border-top: 2px solid #27ae60;
+        }
+        
+        .nav-tab {
+            flex: 1;
+            padding: 15px 20px;
+            text-align: center;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 600;
+            background: transparent;
+            border: none;
+            font-size: 16px;
+            color: #2c3e50;
+        }
+        
+        .nav-tab.active {
+            background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(39, 174, 96, 0.4);
+        }
+        
+        .nav-tab:not(.active):hover {
+            background: linear-gradient(145deg, #f0f8f0 0%, #e8f5e8 100%);
+            color: #27ae60;
+        }
+        
+        .tab-content {
+            display: none;
+            background: linear-gradient(145deg, #ffffff 0%, #f8fffe 100%);
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 
+                0 10px 30px rgba(39, 174, 96, 0.1),
+                0 0 0 1px rgba(39, 174, 96, 0.1);
+            margin-bottom: 20px;
+            border-top: 3px solid #27ae60;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        /* Park Selection Styles */
+        .park-selector {
+            background: linear-gradient(145deg, #f7fcf7 0%, #e8f5e8 100%);
+            border: 2px solid #52c86a;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+            box-shadow: 0 4px 12px rgba(39, 174, 96, 0.1);
+        }
+        
+        .park-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 15px;
+            margin: 15px 0;
+        }
+        
+        .park-option {
+            display: flex;
+            align-items: center;
+            padding: 15px;
+            background: white;
+            border-radius: 10px;
+            border: 2px solid #e8f5e8;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .park-option:hover {
+            border-color: #27ae60;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(39, 174, 96, 0.1);
+        }
+        
+        .park-option.selected {
+            border-color: #27ae60;
+            background: linear-gradient(145deg, #e8f5e8 0%, #d4edda 100%);
+        }
+        
+        .park-option input[type="checkbox"] {
+            margin-right: 12px;
+            transform: scale(1.2);
+        }
+        
+        .park-info h4 {
+            color: #2c3e50;
+            margin-bottom: 5px;
+            font-size: 1.1em;
+        }
+        
+        .park-details {
+            color: #666;
+            font-size: 0.9em;
+        }
+        
+        /* Monitor Tool Styles */
+        .status-card {
+            background: linear-gradient(145deg, #f8fff8 0%, #f0f8f0 100%);
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+            border-left: 5px solid #27ae60;
+            box-shadow: 0 4px 12px rgba(39, 174, 96, 0.1);
+        }
+        
+        .available {
+            border-left-color: #27ae60;
+            background: linear-gradient(145deg, #e8f5e8 0%, #d4edda 100%);
+            color: #155724;
+        }
+        
+        .unavailable {
+            border-left-color: #e74c3c;
+            background: linear-gradient(145deg, #fdf2f2 0%, #f8d7da 100%);
+            color: #721c24;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 15px;
+            margin: 25px 0;
+            flex-wrap: wrap;
+        }
+        
+        button {
+            background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            flex: 1;
+            min-width: 150px;
+            box-shadow: 0 4px 12px rgba(39, 174, 96, 0.2);
+        }
+        
+        button:hover {
+            background: linear-gradient(135deg, #229954 0%, #27ae60 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(39, 174, 96, 0.3);
+        }
+        
+        button:disabled {
+            background: linear-gradient(135deg, #95a5a6 0%, #7f8c8d 100%);
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #6c757d;
+        }
+        
+        .weekend-dates {
+            background: linear-gradient(135deg, #e8f5e8 0%, #d4edda 100%);
+            padding: 18px;
+            border-radius: 10px;
+            margin: 20px 0;
+            text-align: center;
+            font-weight: bold;
+            color: #155724;
+            border: 2px solid #27ae60;
+            box-shadow: 0 4px 12px rgba(39, 174, 96, 0.1);
+        }
+        
+        .notification-settings {
+            background: linear-gradient(145deg, #f7fcf7 0%, #e8f5e8 100%);
+            border: 2px solid #52c86a;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            box-shadow: 0 4px 12px rgba(39, 174, 96, 0.1);
+        }
+        
+        .auto-refresh {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 15px 0;
+            flex-wrap: wrap;
+        }
+        
+        select {
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+            font-size: 14px;
+        }
+        
+        input[type="tel"], input[type="text"], input[type="password"] {
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+            font-size: 14px;
+        }
+        
+        .last-checked {
+            text-align: center;
+            color: #6c757d;
+            font-size: 14px;
+            margin-top: 20px;
+        }
+        
+        .court-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+            font-size: 14px;
+        }
+        
+        .court-table th, .court-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: center;
+        }
+        
+        .court-table th {
+            background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
+            color: white;
+            font-weight: bold;
+            padding: 12px 8px;
+        }
+        
+        .available-slot {
+            background: linear-gradient(145deg, #d4edda 0%, #c3e6cb 100%);
+            color: #155724;
+            font-weight: bold;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+            
+            .hero {
+                padding: 25px 20px;
+            }
+            
+            .hero h1 {
+                font-size: 2em;
+            }
+            
+            .nav-tabs {
+                flex-direction: column;
+            }
+            
+            .controls {
+                flex-direction: column;
+            }
+            
+            .auto-refresh {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            
+            .park-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="hero">
+            <span class="tennis-icon">🎾</span>
+            <h1>NYC Parks Weekend Tennis</h1>
+            <div class="nyc-badge">🗽 4 Boroughs</div>
+            <p class="subtitle">Monitor all NYC Parks tennis courts and get instant weekend availability alerts</p>
+        </div>
+        
+        <div class="nav-tabs">
+            <button class="nav-tab active" onclick="showTab('monitor')">Court Monitor</button>
+            <button class="nav-tab" onclick="showTab('about')">About & Parks</button>
+        </div>
+        
+        <!-- Monitor Tool Tab -->
+        <div id="monitor" class="tab-content active">
+            <div class="park-selector">
+                <strong>🏞️ Select Parks to Monitor:</strong>
+                <div class="park-grid" id="parkGrid">
+                    <!-- Parks will be populated by JavaScript -->
+                </div>
+                <p style="font-size: 0.9em; color: #666; margin-top: 10px;">
+                    Select one or more parks to monitor. The tool will check all selected locations.
+                </p>
+            </div>
+            
+            <div class="weekend-dates" id="weekendDates">
+                This Weekend: Loading...
+            </div>
+            
+            <div class="controls">
+                <button onclick="checkAvailability()" id="checkBtn">Check Now</button>
+                <button onclick="toggleAutoRefresh()" id="autoBtn">Start Auto-Check</button>
+                <button onclick="playTestSound()">Test Sound</button>
+            </div>
+            
+            <div class="auto-refresh">
+                <label for="refreshInterval">Auto-check every:</label>
+                <select id="refreshInterval">
+                    <option value="30">30 seconds</option>
+                    <option value="60" selected>1 minute</option>
+                    <option value="300">5 minutes</option>
+                    <option value="600">10 minutes</option>
+                </select>
+            </div>
+            
+            <div class="notification-settings">
+                <strong>⏰ Time Filters:</strong>
+                <div style="margin: 10px 0;">
+                    <label style="display: flex; align-items: center; margin: 5px 0;">
+                        <input type="checkbox" id="morningFilter" checked style="margin-right: 8px;">
+                        Morning slots (before 1:00 PM)
+                    </label>
+                    <label style="display: flex; align-items: center; margin: 5px 0;">
+                        <input type="checkbox" id="eveningFilter" checked style="margin-right: 8px;">
+                        Afternoon/Evening slots (1:00 PM and after)
+                    </label>
+                </div>
+            </div>
+            
+            <div class="notification-settings">
+                <strong>🔔 Notification Settings:</strong>
+                <div style="margin: 10px 0;">
+                    <label style="display: flex; align-items: center; margin: 5px 0;">
+                        <input type="checkbox" id="soundNotifications" checked style="margin-right: 8px;">
+                        Sound notifications
+                    </label>
+                    <label style="display: flex; align-items: center; margin: 5px 0;">
+                        <input type="checkbox" id="browserNotifications" checked style="margin-right: 8px;">
+                        Browser notifications
+                    </label>
+                    <label style="display: flex; align-items: center; margin: 5px 0;">
+                        <input type="checkbox" id="smsNotifications" onchange="toggleSMSSettings()" style="margin-right: 8px;">
+                        SMS notifications
+                    </label>
+                </div>
+                
+                <div id="smsSettings" style="display: none; margin-top: 15px; padding: 15px; background: #e8f4f8; border-radius: 8px;">
+                    <h4>📱 SMS Configuration</h4>
+                    <div style="margin: 10px 0;">
+                        <label>Phone Number (with country code):</label><br>
+                        <input type="tel" id="phoneNumber" placeholder="+1234567890" style="width: 200px; padding: 8px; margin: 5px 0; border: 1px solid #ddd; border-radius: 4px;">
+                    </div>
+                    
+                    <div style="margin: 15px 0;">
+                        <strong>Twilio API Configuration:</strong>
+                        <div style="margin: 10px 0;">
+                            <input type="text" id="twilioSid" placeholder="Twilio Account SID" style="width: 250px; padding: 5px; margin: 5px 0; display: block;">
+                            <input type="password" id="twilioToken" placeholder="Twilio Auth Token" style="width: 250px; padding: 5px; margin: 5px 0; display: block;">
+                            <input type="tel" id="twilioFrom" placeholder="Twilio Phone Number" style="width: 250px; padding: 5px; margin: 5px 0; display: block;">
+                            <small style="color: #666;">Get these from your <a href="https://console.twilio.com/" target="_blank">Twilio Console</a></small>
+                        </div>
+                    </div>
+                    
+                    <button onclick="testSMS()" style="background: #28a745; margin-top: 10px;">Test SMS</button>
+                </div>
+                
+                <p style="margin-top: 15px; font-size: 14px; color: #666;">
+                    Keep this tab open for notifications to work. By entering your phone number, you opt-in to receive SMS notifications about tennis court availability.
+                </p>
+            </div>
+            
+            <div id="results">
+                <div class="loading">Select parks and click "Check Now" to start monitoring</div>
+            </div>
+            
+            <div class="last-checked" id="lastChecked"></div>
+        </div>
+        
+        <!-- About Tab -->
+        <div id="about" class="tab-content">
+            <h2>🗽 About NYC Parks Weekend Tennis</h2>
+            <p>This tool monitors the official NYC Parks tennis reservation system across 4 boroughs and sends notifications when courts become available for the upcoming weekend.</p>
+            
+            <div style="text-align: center; margin-top: 30px; padding: 25px; background: linear-gradient(145deg, #f8fff8 0%, #f0f8f0 100%); border-radius: 12px; border: 2px solid #e8f5e8; box-shadow: 0 4px 12px rgba(39, 174, 96, 0.1);">
+                <h3>📞 Contact & Support</h3>
+                <p><strong>Tool Support:</strong> <a href="mailto:tenniscourtmonitor@gmail.com" style="color: #27ae60;">tenniscourtmonitor@gmail.com</a></p>
+                <p><strong>NYC Parks Tennis:</strong> <a href="https://www.nycgovparks.org/things-to-do/tennis" target="_blank" style="color: #27ae60;">Official Tennis Information</a></p>
+                <p style="margin-top: 15px; font-size: 0.9em; color: #666;">
+                    🌳 Independent monitoring tool for NYC Parks tennis courts • Not affiliated with NYC Parks
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        var autoRefreshInterval = null;
+        var isAutoRefreshing = false;
+        
+        // NYC Parks tennis facilities data with correct availability IDs
         var nycParks = [
             {
                 id: 12,
@@ -64,3 +593,865 @@
                 availabilityId: 13
             }
         ];
+        
+        // Tab Management
+        function showTab(tabName) {
+            var tabs = document.querySelectorAll('.tab-content');
+            for (var i = 0; i < tabs.length; i++) {
+                tabs[i].classList.remove('active');
+            }
+            var navTabs = document.querySelectorAll('.nav-tab');
+            for (var i = 0; i < navTabs.length; i++) {
+                navTabs[i].classList.remove('active');
+            }
+            
+            document.getElementById(tabName).classList.add('active');
+            event.target.classList.add('active');
+        }
+        
+        // Initialize park selector
+        function initializeParkSelector() {
+            console.log('🏞️ Initializing park selector...');
+            var parkGrid = document.getElementById('parkGrid');
+            
+            if (!parkGrid) {
+                console.error('Park grid element not found');
+                return;
+            }
+            
+            console.log('Found park grid, adding ' + nycParks.length + ' parks');
+            
+            for (var i = 0; i < nycParks.length; i++) {
+                var park = nycParks[i];
+                var parkOption = document.createElement('div');
+                parkOption.className = 'park-option';
+                parkOption.innerHTML = 
+                    '<input type="checkbox" id="park_' + park.id + '" value="' + park.id + '" onchange="toggleParkSelection(' + park.id + ')">' +
+                    '<div class="park-info">' +
+                        '<h4>' + park.name + '</h4>' +
+                        '<div class="park-details">' +
+                            park.borough + ' • ' + park.courts + ' courts • ' + park.surface + ' surface' +
+                        '</div>' +
+                    '</div>';
+                parkGrid.appendChild(parkOption);
+                console.log('✅ Added park: ' + park.name);
+            }
+            
+            // Load saved selections
+            loadParkSelections();
+        }
+        
+        // Toggle park selection
+        function toggleParkSelection(parkId) {
+            var checkbox = document.getElementById('park_' + parkId);
+            var parkOption = checkbox.closest('.park-option');
+            
+            if (checkbox.checked) {
+                parkOption.classList.add('selected');
+            } else {
+                parkOption.classList.remove('selected');
+            }
+            
+            saveParkSelections();
+        }
+        
+        // Save park selections to localStorage
+        function saveParkSelections() {
+            var selectedParks = [];
+            for (var i = 0; i < nycParks.length; i++) {
+                var checkbox = document.getElementById('park_' + nycParks[i].id);
+                if (checkbox && checkbox.checked) {
+                    selectedParks.push(nycParks[i].id);
+                }
+            }
+            
+            try {
+                localStorage.setItem('selectedParks', JSON.stringify(selectedParks));
+            } catch (e) {
+                console.log('Could not save park selections');
+            }
+        }
+        
+        // Load park selections from localStorage
+        function loadParkSelections() {
+            try {
+                var savedParks = localStorage.getItem('selectedParks');
+                if (savedParks) {
+                    var selectedParks = JSON.parse(savedParks);
+                    for (var i = 0; i < selectedParks.length; i++) {
+                        var checkbox = document.getElementById('park_' + selectedParks[i]);
+                        if (checkbox) {
+                            checkbox.checked = true;
+                            toggleParkSelection(selectedParks[i]);
+                        }
+                    }
+                } else {
+                    // Default to Central Park selected
+                    var centralPark = document.getElementById('park_12');
+                    if (centralPark) {
+                        centralPark.checked = true;
+                        toggleParkSelection(12);
+                    }
+                }
+            } catch (e) {
+                console.log('Could not load park selections');
+            }
+        }
+        
+        // Get selected parks
+        function getSelectedParkIds() {
+            var selectedParks = [];
+            for (var i = 0; i < nycParks.length; i++) {
+                var checkbox = document.getElementById('park_' + nycParks[i].id);
+                if (checkbox && checkbox.checked) {
+                    selectedParks.push(nycParks[i].id);
+                }
+            }
+            return selectedParks;
+        }
+        
+        // Get this weekend's dates based on current day
+        function getWeekendDates() {
+            var today = new Date();
+            var dayOfWeek = today.getDay();
+            
+            var saturday, sunday;
+            
+            if (dayOfWeek === 0) {
+                sunday = new Date(today);
+                saturday = new Date(today);
+                saturday.setDate(today.getDate() - 1);
+            } else if (dayOfWeek === 6) {
+                saturday = new Date(today);
+                sunday = new Date(today);
+                sunday.setDate(today.getDate() + 1);
+            } else {
+                var daysUntilSaturday = 6 - dayOfWeek;
+                saturday = new Date(today);
+                saturday.setDate(today.getDate() + daysUntilSaturday);
+                
+                sunday = new Date(saturday);
+                sunday.setDate(saturday.getDate() + 1);
+            }
+            
+            var formatDate = function(date) {
+                var days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                var months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+                return days[date.getDay()] + ', ' + months[date.getMonth()] + ' ' + date.getDate() + ', ' + date.getFullYear();
+            };
+            
+            return {
+                saturday: saturday,
+                sunday: sunday,
+                saturdayFormatted: formatDate(saturday),
+                sundayFormatted: formatDate(sunday)
+            };
+        }
+        
+        // Update weekend dates display
+        function updateWeekendDisplay() {
+            var dates = getWeekendDates();
+            var today = new Date();
+            var dayOfWeek = today.getDay();
+            
+            var weekendLabel = "This Weekend";
+            if (dayOfWeek === 0) {
+                weekendLabel = "This Weekend (Today & Yesterday)";
+            } else if (dayOfWeek === 6) {
+                weekendLabel = "This Weekend (Today & Tomorrow)";
+            } else {
+                weekendLabel = "This Weekend (Upcoming)";
+            }
+            
+            document.getElementById('weekendDates').innerHTML = 
+                weekendLabel + ': ' + dates.saturdayFormatted + ' & ' + dates.sundayFormatted;
+        }
+        
+        // Filter slots based on time preferences
+        function filterSlotsByTime(slots) {
+            var morningEnabled = document.getElementById('morningFilter').checked;
+            var eveningEnabled = document.getElementById('eveningFilter').checked;
+            
+            if (!morningEnabled && !eveningEnabled) {
+                return [];
+            }
+            
+            var filteredSlots = [];
+            for (var i = 0; i < slots.length; i++) {
+                var slot = slots[i];
+                var timeStr = slot.time.toLowerCase();
+                var hour = parseInt(timeStr.split(':')[0]);
+                var isPM = timeStr.indexOf('p') !== -1;
+                
+                if (isPM && hour !== 12) {
+                    hour += 12;
+                } else if (!isPM && hour === 12) {
+                    hour = 0;
+                }
+                
+                var isMorning = hour < 13;
+                var isEvening = hour >= 13;
+                
+                if ((morningEnabled && isMorning) || (eveningEnabled && isEvening)) {
+                    filteredSlots.push(slot);
+                }
+            }
+            return filteredSlots;
+        }
+        
+        // Parse court data from HTML content with stricter date matching
+        function parseCourtData(htmlContent, parkId) {
+            console.log('🔍 Parsing data for park ' + parkId);
+            
+            var dates = getWeekendDates();
+            var saturdayStr = dates.saturday.toLocaleDateString('en-US', { 
+                weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' 
+            });
+            var sundayStr = dates.sunday.toLocaleDateString('en-US', { 
+                weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' 
+            });
+            
+            console.log('📅 Target dates: "' + saturdayStr + '" and "' + sundayStr + '"');
+            
+            var park = null;
+            for (var i = 0; i < nycParks.length; i++) {
+                if (nycParks[i].id === parkId) {
+                    park = nycParks[i];
+                    break;
+                }
+            }
+            
+            var results = {
+                parkName: park ? park.name : 'Park ' + parkId,
+                saturday: { available: [], date: saturdayStr },
+                sunday: { available: [], date: sundayStr }
+            };
+            
+            // Check if we have valid HTML content
+            if (!htmlContent || htmlContent.length < 1000) {
+                console.log('❌ Invalid or short HTML content for park ' + parkId);
+                return results;
+            }
+            
+            // Use DOM parsing for more accurate structure analysis
+            try {
+                var parser = new DOMParser();
+                var doc = parser.parseFromString(htmlContent, 'text/html');
+                
+                // Look for date-specific sections
+                var dateElements = doc.querySelectorAll('h3, .tab-pane, [id*="2025"], .day-header');
+                
+                for (var i = 0; i < dateElements.length; i++) {
+                    var element = dateElements[i];
+                    var elementText = element.textContent || '';
+                    var elementId = element.id || '';
+                    
+                    // Check if this element represents our target weekend
+                    var isSaturdaySection = elementText.indexOf(saturdayStr) !== -1;
+                    var isSundaySection = elementText.indexOf(sundayStr) !== -1;
+                    
+                    if (isSaturdaySection || isSundaySection) {
+                        console.log('📅 Found ' + (isSaturdaySection ? 'Saturday' : 'Sunday') + ' section: ' + elementText.substring(0, 100));
+                        
+                        // Look for tables within or after this section
+                        var tableContainer = element;
+                        if (element.tagName === 'H3') {
+                            // For h3 headers, look for the next sibling container
+                            tableContainer = element.parentElement;
+                        }
+                        
+                        var tables = tableContainer.querySelectorAll('table');
+                        
+                        for (var j = 0; j < tables.length; j++) {
+                            var table = tables[j];
+                            var rows = table.querySelectorAll('tr');
+                            
+                            for (var k = 0; k < rows.length; k++) {
+                                var row = rows[k];
+                                var cells = row.querySelectorAll('td, th');
+                                
+                                if (cells.length > 0) {
+                                    // Look for time in first cell
+                                    var firstCellText = cells[0].textContent || '';
+                                    var timeMatch = firstCellText.match(/(\d{1,2}:\d{2}\s*[ap]\.?m\.?)/i);
+                                    
+                                    if (timeMatch) {
+                                        // Check each cell for reserve links
+                                        for (var l = 0; l < cells.length; l++) {
+                                            var cell = cells[l];
+                                            var reserveLink = cell.querySelector('a[href*="/tennisreservation/reservecp/"], a[href*="/tennisreservation/reserve/"]');
+                                            
+                                            if (reserveLink && cell.textContent.indexOf('Reserve this time') !== -1) {
+                                                // Get court number from table header
+                                                var courtNumber = 'Unknown';
+                                                var tableHeaders = table.querySelectorAll('th');
+                                                if (tableHeaders[l]) {
+                                                    var headerText = tableHeaders[l].textContent;
+                                                    var courtMatch = headerText.match(/Court\s*(\d+)/i);
+                                                    if (courtMatch) {
+                                                        courtNumber = courtMatch[1];
+                                                    }
+                                                }
+                                                
+                                                var slot = {
+                                                    time: timeMatch[1],
+                                                    court: courtNumber,
+                                                    link: reserveLink.getAttribute('href'),
+                                                    park: results.parkName
+                                                };
+                                                
+                                                if (isSaturdaySection) {
+                                                    results.saturday.available.push(slot);
+                                                    console.log('➕ Added to Saturday: ' + slot.time + ' Court ' + slot.court);
+                                                } else if (isSundaySection) {
+                                                    results.sunday.available.push(slot);
+                                                    console.log('➕ Added to Sunday: ' + slot.time + ' Court ' + slot.court);
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('❌ DOM parsing error for park ' + parkId + ':', error);
+                
+                // Fallback to line-by-line parsing with much stricter matching
+                var lines = htmlContent.split('\n');
+                var inTargetDateSection = false;
+                var currentTargetDay = null;
+                
+                for (var i = 0; i < lines.length; i++) {
+                    var line = lines[i].trim();
+                    
+                    // Very strict date section detection
+                    if (line.indexOf(saturdayStr) !== -1) {
+                        inTargetDateSection = true;
+                        currentTargetDay = 'saturday';
+                        console.log('📅 STRICT: Found Saturday section at line ' + i);
+                        continue;
+                    } else if (line.indexOf(sundayStr) !== -1) {
+                        inTargetDateSection = true;
+                        currentTargetDay = 'sunday';
+                        console.log('📅 STRICT: Found Sunday section at line ' + i);
+                        continue;
+                    }
+                    
+                    // Exit target section if we hit another date
+                    if (inTargetDateSection && line.match(/\w+,\s+\w+\s+\d{1,2},\s+\d{4}/) && 
+                        line.indexOf(saturdayStr) === -1 && line.indexOf(sundayStr) === -1) {
+                        inTargetDateSection = false;
+                        currentTargetDay = null;
+                        console.log('📅 STRICT: Exited target section at line ' + i + ' due to: ' + line.substring(0, 50));
+                        continue;
+                    }
+                    
+                    // Only process reserve links when strictly in target section
+                    if (inTargetDateSection && currentTargetDay && 
+                        line.indexOf('Reserve this time') !== -1 && 
+                        line.indexOf('/tennisreservation/reservecp/') !== -1) {
+                        
+                        var timeMatch = line.match(/(\d{1,2}:\d{2}\s*[ap]\.?m\.?)/i);
+                        var linkMatch = line.match(/href="([^"]*tennisreservation\/reservecp\/[^"]*)"/);
+                        
+                        if (timeMatch && linkMatch) {
+                            var courtNum = 'Unknown';
+                            var courtMatch = line.match(/Court\s*(\d+)/i);
+                            if (courtMatch) {
+                                courtNum = courtMatch[1];
+                            }
+                            
+                            var slot = {
+                                time: timeMatch[1],
+                                court: courtNum,
+                                link: linkMatch[1],
+                                park: results.parkName
+                            };
+                            
+                            if (currentTargetDay === 'saturday') {
+                                results.saturday.available.push(slot);
+                                console.log('➕ STRICT: Added to Saturday: ' + slot.time + ' Court ' + slot.court);
+                            } else if (currentTargetDay === 'sunday') {
+                                results.sunday.available.push(slot);
+                                console.log('➕ STRICT: Added to Sunday: ' + slot.time + ' Court ' + slot.court);
+                            }
+                        }
+                    }
+                }
+            }
+            
+            console.log('📊 Final results for ' + results.parkName + ': Saturday=' + results.saturday.available.length + ', Sunday=' + results.sunday.available.length);
+            return results;
+        }
+        
+        // Display results for all parks
+        function displayAllResults(allResults) {
+            var resultsDiv = document.getElementById('results');
+            
+            var totalAvailable = 0;
+            for (var i = 0; i < allResults.length; i++) {
+                totalAvailable += allResults[i].saturday.available.length + allResults[i].sunday.available.length;
+            }
+            
+            var morningEnabled = document.getElementById('morningFilter').checked;
+            var eveningEnabled = document.getElementById('eveningFilter').checked;
+            
+            var timeFilterText = '';
+            if (morningEnabled && eveningEnabled) {
+                timeFilterText = ' (all times)';
+            } else if (morningEnabled) {
+                timeFilterText = ' (morning slots only)';
+            } else if (eveningEnabled) {
+                timeFilterText = ' (afternoon/evening slots only)';
+            } else {
+                timeFilterText = ' (no time filters selected)';
+            }
+            
+            var html = '';
+            
+            if (totalAvailable === 0) {
+                html = 
+                    '<div class="status-card unavailable">' +
+                        '<h3>❌ No Courts Available</h3>' +
+                        '<p>No courts are currently available for reservation this weekend' + timeFilterText + ' at your selected parks.</p>' +
+                    '</div>';
+                
+                // Show status for each park
+                for (var i = 0; i < allResults.length; i++) {
+                    var park = allResults[i];
+                    html += 
+                        '<div class="status-card">' +
+                            '<h4>' + park.parkName + '</h4>' +
+                            '<p><strong>Saturday:</strong> ' + park.saturday.date + ' - No matching slots</p>' +
+                            '<p><strong>Sunday:</strong> ' + park.sunday.date + ' - No matching slots</p>' +
+                        '</div>';
+                }
+            } else {
+                html = 
+                    '<div class="status-card available">' +
+                        '<h3>✅ Courts Available!</h3>' +
+                        '<p><strong>' + totalAvailable + '</strong> court slot(s) available this weekend' + timeFilterText + '!</p>' +
+                    '</div>';
+                
+                // Show results for each park with available courts
+                for (var i = 0; i < allResults.length; i++) {
+                    var park = allResults[i];
+                    var parkTotal = park.saturday.available.length + park.sunday.available.length;
+                    if (parkTotal > 0) {
+                        html += '<div class="status-card"><h4>' + park.parkName + ' (' + parkTotal + ' slots)</h4>';
+                        
+                        // Saturday results
+                        if (park.saturday.available.length > 0) {
+                            html += 
+                                '<h5>Saturday - ' + park.saturday.date + ' (' + park.saturday.available.length + ' slots)</h5>' +
+                                '<table class="court-table">' +
+                                    '<tr><th>Time</th><th>Court</th><th>Action</th></tr>';
+                            
+                            for (var j = 0; j < park.saturday.available.length; j++) {
+                                var slot = park.saturday.available[j];
+                                html += 
+                                    '<tr class="available-slot">' +
+                                        '<td>' + slot.time + '</td>' +
+                                        '<td>Court ' + slot.court + '</td>' +
+                                        '<td><a href="https://www.nycgovparks.org' + slot.link + '" target="_blank">Reserve Now</a></td>' +
+                                    '</tr>';
+                            }
+                            html += '</table>';
+                        }
+                        
+                        // Sunday results
+                        if (park.sunday.available.length > 0) {
+                            html += 
+                                '<h5>Sunday - ' + park.sunday.date + ' (' + park.sunday.available.length + ' slots)</h5>' +
+                                '<table class="court-table">' +
+                                    '<tr><th>Time</th><th>Court</th><th>Action</th></tr>';
+                            
+                            for (var j = 0; j < park.sunday.available.length; j++) {
+                                var slot = park.sunday.available[j];
+                                html += 
+                                    '<tr class="available-slot">' +
+                                        '<td>' + slot.time + '</td>' +
+                                        '<td>Court ' + slot.court + '</td>' +
+                                        '<td><a href="https://www.nycgovparks.org' + slot.link + '" target="_blank">Reserve Now</a></td>' +
+                                    '</tr>';
+                            }
+                            html += '</table>';
+                        }
+                        
+                        html += '</div>';
+                    }
+                }
+            }
+            
+            resultsDiv.innerHTML = html;
+        }
+        
+        // Check court availability
+        function checkAvailability() {
+            var checkBtn = document.getElementById('checkBtn');
+            var resultsDiv = document.getElementById('results');
+            
+            var selectedParkIds = getSelectedParkIds();
+            if (selectedParkIds.length === 0) {
+                resultsDiv.innerHTML = 
+                    '<div class="status-card unavailable">' +
+                        '<h3>⚠️ No Parks Selected</h3>' +
+                        '<p>Please select at least one park to monitor from the list above.</p>' +
+                    '</div>';
+                return;
+            }
+            
+            checkBtn.disabled = true;
+            checkBtn.textContent = 'Checking...';
+            resultsDiv.innerHTML = '<div class="loading">Checking court availability across selected parks...</div>';
+            
+            console.log('🔍 Starting availability check for ' + selectedParkIds.length + ' parks');
+            
+            var BACKEND_PROXY_URL = 'https://tennis-court-monitor.vercel.app/api/proxy';
+            var allResults = [];
+            var completed = 0;
+            
+            // Check each selected park
+            for (var i = 0; i < selectedParkIds.length; i++) {
+                var parkId = selectedParkIds[i];
+                checkSinglePark(parkId, BACKEND_PROXY_URL, function(parkResult) {
+                    if (parkResult) {
+                        allResults.push(parkResult);
+                    }
+                    completed++;
+                    
+                    // When all parks are checked
+                    if (completed === selectedParkIds.length) {
+                        console.log('✅ Completed checking all parks');
+                        displayAllResults(allResults);
+                        updateLastChecked();
+                        
+                        // Check for notifications
+                        var totalAvailable = 0;
+                        for (var i = 0; i < allResults.length; i++) {
+                            totalAvailable += allResults[i].saturday.available.length + allResults[i].sunday.available.length;
+                        }
+                        
+                        if (totalAvailable > 0) {
+                            var parkNames = [];
+                            for (var i = 0; i < allResults.length; i++) {
+                                var park = allResults[i];
+                                if (park.saturday.available.length > 0 || park.sunday.available.length > 0) {
+                                    parkNames.push(park.parkName);
+                                }
+                            }
+                            
+                            var notificationMessage = '🎾 Tennis courts available! ' + totalAvailable + ' slot(s) found:\n' +
+                                                    'Parks: ' + parkNames.join(', ') + '\n' +
+                                                    'Book now: https://www.nycgovparks.org/tennisreservation';
+                            
+                            console.log('🔔 Courts found! Triggering notifications...');
+                            
+                            if (document.getElementById('soundNotifications').checked) {
+                                playNotificationSound();
+                            }
+                            
+                            if (document.getElementById('browserNotifications').checked && Notification.permission === 'granted') {
+                                new Notification('NYC Tennis Courts Available!', {
+                                    body: totalAvailable + ' court slot(s) now available across ' + parkNames.length + ' park(s).',
+                                    icon: '🎾'
+                                });
+                            }
+                            
+                            sendSMS(notificationMessage);
+                        }
+                        
+                        checkBtn.disabled = false;
+                        checkBtn.textContent = 'Check Now';
+                    }
+                });
+            }
+        }
+        
+        // Check a single park
+        function checkSinglePark(parkId, proxyUrl, callback) {
+            console.log('🔍 Checking park ' + parkId);
+            
+            // Find the park and get its availability ID
+            var park = null;
+            for (var i = 0; i < nycParks.length; i++) {
+                if (nycParks[i].id === parkId) {
+                    park = nycParks[i];
+                    break;
+                }
+            }
+            
+            if (!park || !park.availabilityId) {
+                console.error('❌ No availability ID found for park ' + parkId);
+                callback(null);
+                return;
+            }
+            
+            var availabilityId = park.availabilityId;
+            console.log('🔗 Using availability ID ' + availabilityId + ' for ' + park.name);
+            
+            var xhr = new XMLHttpRequest();
+            xhr.open('GET', proxyUrl + '?parkId=' + availabilityId, true);
+            xhr.setRequestHeader('Accept', 'application/json');
+            
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === 4) {
+                    if (xhr.status === 200) {
+                        try {
+                            var jsonData = JSON.parse(xhr.responseText);
+                            var htmlContent = jsonData.contents || '';
+                            
+                            if (htmlContent && htmlContent.length > 1000) {
+                                var courtData = parseCourtData(htmlContent, parkId);
+                                
+                                // Apply time filters
+                                courtData.saturday.available = filterSlotsByTime(courtData.saturday.available);
+                                courtData.sunday.available = filterSlotsByTime(courtData.sunday.available);
+                                
+                                console.log('✅ Successfully parsed park ' + parkId + ' (availability ID ' + availabilityId + ')');
+                                callback(courtData);
+                            } else {
+                                console.log('❌ No valid content for park ' + parkId);
+                                callback(null);
+                            }
+                        } catch (error) {
+                            console.error('❌ Error parsing response for park ' + parkId + ':', error);
+                            callback(null);
+                        }
+                    } else {
+                        console.error('❌ HTTP error for park ' + parkId + ': ' + xhr.status);
+                        callback(null);
+                    }
+                }
+            };
+            
+            xhr.onerror = function() {
+                console.error('❌ Network error for park ' + parkId);
+                callback(null);
+            };
+            
+            xhr.send();
+        }
+        
+        // Update last checked time
+        function updateLastChecked() {
+            var now = new Date();
+            var lastCheckedEl = document.getElementById('lastChecked');
+            if (lastCheckedEl) {
+                lastCheckedEl.textContent = 'Last checked: ' + now.toLocaleTimeString();
+            }
+        }
+        
+        // Play test sound
+        function playTestSound() {
+            console.log('🔊 Playing test sound...');
+            playNotificationSound();
+        }
+        function playNotificationSound() {
+            try {
+                var audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                
+                var frequencies = [800, 1000, 1200];
+                for (var i = 0; i < frequencies.length; i++) {
+                    (function(freq, index) {
+                        setTimeout(function() {
+                            var oscillator = audioContext.createOscillator();
+                            var gainNode = audioContext.createGain();
+                            
+                            oscillator.connect(gainNode);
+                            gainNode.connect(audioContext.destination);
+                            
+                            oscillator.frequency.value = freq;
+                            oscillator.type = 'sine';
+                            
+                            gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+                            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+                            
+                            oscillator.start(audioContext.currentTime);
+                            oscillator.stop(audioContext.currentTime + 0.5);
+                        }, index * 200);
+                    })(frequencies[i], i);
+                }
+            } catch (e) {
+                console.log('❌ Audio not supported or blocked:', e);
+            }
+        }
+        
+        // SMS Notification Functions
+        function sendSMS(message) {
+            var smsEnabled = document.getElementById('smsNotifications').checked;
+            if (!smsEnabled) return;
+            
+            var phoneNumber = document.getElementById('phoneNumber').value.trim();
+            
+            if (!phoneNumber) {
+                console.log('📱 No phone number configured for SMS');
+                return;
+            }
+            
+            sendTwilioSMS(message, phoneNumber);
+        }
+        
+        function sendTwilioSMS(message, phoneNumber) {
+            var accountSid = document.getElementById('twilioSid').value.trim();
+            var authToken = document.getElementById('twilioToken').value.trim();
+            var fromNumber = document.getElementById('twilioFrom').value.trim();
+            
+            if (!accountSid || !authToken || !fromNumber) {
+                showNotificationStatus('❌ Please fill in all Twilio credentials');
+                return;
+            }
+            
+            console.log('📱 Sending SMS via Twilio...');
+            
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', 'https://api.twilio.com/2010-04-01/Accounts/' + accountSid + '/Messages.json', true);
+            xhr.setRequestHeader('Authorization', 'Basic ' + btoa(accountSid + ':' + authToken));
+            xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+            
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === 4) {
+                    if (xhr.status === 201) {
+                        showNotificationStatus('✅ SMS sent successfully via Twilio!');
+                        console.log('✅ SMS sent successfully');
+                    } else {
+                        var errorText = xhr.responseText;
+                        console.error('❌ Twilio SMS error:', errorText);
+                        showNotificationStatus('❌ Failed to send SMS via Twilio');
+                    }
+                }
+            };
+            
+            xhr.onerror = function() {
+                console.error('❌ SMS sending network error');
+                showNotificationStatus('❌ Error sending SMS - check console for details');
+            };
+            
+            var params = 'From=' + encodeURIComponent(fromNumber) +
+                        '&To=' + encodeURIComponent(phoneNumber) +
+                        '&Body=' + encodeURIComponent(message);
+            
+            xhr.send(params);
+        }
+        
+        function testSMS() {
+            var message = "🎾 Test: NYC Parks tennis monitor is working! This is how you'll be notified when courts become available.";
+            sendSMS(message);
+        }
+        
+        function showNotificationStatus(message) {
+            var statusDiv = document.createElement('div');
+            statusDiv.style.cssText = 
+                'position: fixed;' +
+                'top: 20px;' +
+                'right: 20px;' +
+                'background: #007bff;' +
+                'color: white;' +
+                'padding: 15px;' +
+                'border-radius: 8px;' +
+                'z-index: 1000;' +
+                'max-width: 300px;' +
+                'box-shadow: 0 4px 12px rgba(0,0,0,0.2);';
+            statusDiv.textContent = message;
+            document.body.appendChild(statusDiv);
+            
+            setTimeout(function() {
+                if (statusDiv.parentNode) {
+                    document.body.removeChild(statusDiv);
+                }
+            }, 5000);
+        }
+        
+        // Toggle SMS settings visibility
+        function toggleSMSSettings() {
+            var smsEnabled = document.getElementById('smsNotifications').checked;
+            var smsSettings = document.getElementById('smsSettings');
+            smsSettings.style.display = smsEnabled ? 'block' : 'none';
+        }
+        
+        // Request notification permission
+        function requestNotificationPermission() {
+            if ('Notification' in window && Notification.permission === 'default') {
+                Notification.requestPermission();
+            }
+        }
+        
+        // Save SMS settings
+        function saveSMSSettings() {
+            try {
+                localStorage.setItem('tennisMonitor_phone', document.getElementById('phoneNumber').value);
+                localStorage.setItem('tennisMonitor_twilioSid', document.getElementById('twilioSid').value);
+                localStorage.setItem('tennisMonitor_twilioFrom', document.getElementById('twilioFrom').value);
+                // Note: We don't save the auth token for security
+            } catch (e) {
+                console.log('Could not save SMS settings');
+            }
+        }
+        
+        // Load SMS settings
+        function loadSMSSettings() {
+            try {
+                var savedPhone = localStorage.getItem('tennisMonitor_phone');
+                var savedSid = localStorage.getItem('tennisMonitor_twilioSid');
+                var savedFrom = localStorage.getItem('tennisMonitor_twilioFrom');
+                
+                if (savedPhone) document.getElementById('phoneNumber').value = savedPhone;
+                if (savedSid) document.getElementById('twilioSid').value = savedSid;
+                if (savedFrom) document.getElementById('twilioFrom').value = savedFrom;
+            } catch (e) {
+                console.log('Could not load SMS settings');
+            }
+        }
+        
+        // Toggle auto refresh
+        function toggleAutoRefresh() {
+            var autoBtn = document.getElementById('autoBtn');
+            var intervalSelect = document.getElementById('refreshInterval');
+            
+            if (isAutoRefreshing) {
+                clearInterval(autoRefreshInterval);
+                autoBtn.textContent = 'Start Auto-Check';
+                intervalSelect.disabled = false;
+                isAutoRefreshing = false;
+                console.log('⏹️ Auto-refresh stopped');
+            } else {
+                var interval = parseInt(intervalSelect.value) * 1000;
+                autoRefreshInterval = setInterval(checkAvailability, interval);
+                autoBtn.textContent = 'Stop Auto-Check';
+                intervalSelect.disabled = true;
+                isAutoRefreshing = true;
+                console.log('▶️ Auto-refresh started - checking every ' + intervalSelect.value + ' seconds');
+                
+                checkAvailability();
+            }
+        }
+        
+        // Initialize everything when page loads
+        window.onload = function() {
+            console.log('🚀 Initializing NYC Parks Tennis Monitor...');
+            
+            try {
+                initializeParkSelector();
+                updateWeekendDisplay();
+                requestNotificationPermission();
+                loadSMSSettings();
+                
+                // Add event listeners for SMS settings
+                var smsInputs = ['phoneNumber', 'twilioSid', 'twilioFrom'];
+                for (var i = 0; i < smsInputs.length; i++) {
+                    var element = document.getElementById(smsInputs[i]);
+                    if (element) {
+                        element.addEventListener('change', saveSMSSettings);
+                    }
+                }
+                
+                console.log('✅ Initialization complete!');
+            } catch (error) {
+                console.error('❌ Initialization error:', error);
+            }
+        };
+    </script>
+</body>
+</html>
