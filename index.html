@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NYC Parks Weekend Tennis</title>
+    <meta name="description" content="Monitor all NYC Parks tennis court availability and receive SMS notifications when courts become available.">
     <style>
         * {
             margin: 0;
@@ -17,6 +18,21 @@
             color: #2c3e50;
             background: linear-gradient(135deg, #27ae60 0%, #2ecc71 50%, #52c86a 100%);
             min-height: 100vh;
+            position: relative;
+        }
+        
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-image: 
+                radial-gradient(circle at 20% 20%, rgba(46, 204, 113, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(39, 174, 96, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 40% 40%, rgba(82, 200, 106, 0.05) 0%, transparent 50%);
+            pointer-events: none;
         }
         
         .container {
@@ -30,9 +46,24 @@
             background: linear-gradient(145deg, #ffffff 0%, #f8fffe 100%);
             border-radius: 20px;
             padding: 40px;
-            box-shadow: 0 20px 60px rgba(39, 174, 96, 0.15);
+            box-shadow: 
+                0 20px 60px rgba(39, 174, 96, 0.15),
+                0 0 0 1px rgba(39, 174, 96, 0.1);
             margin-bottom: 30px;
             border-top: 4px solid #27ae60;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(39, 174, 96, 0.03) 0%, transparent 70%);
+            pointer-events: none;
         }
         
         .hero h1 {
@@ -43,6 +74,8 @@
             -webkit-text-fill-color: transparent;
             background-clip: text;
             font-weight: 700;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            position: relative;
         }
         
         .hero .subtitle {
@@ -60,9 +93,15 @@
         }
         
         @keyframes bounce {
-            0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
-            40% { transform: translateY(-10px); }
-            60% { transform: translateY(-5px); }
+            0%, 20%, 50%, 80%, 100% {
+                transform: translateY(0);
+            }
+            40% {
+                transform: translateY(-10px);
+            }
+            60% {
+                transform: translateY(-5px);
+            }
         }
         
         .nyc-badge {
@@ -85,7 +124,9 @@
             border-radius: 15px;
             padding: 10px;
             margin-bottom: 20px;
-            box-shadow: 0 10px 30px rgba(39, 174, 96, 0.1);
+            box-shadow: 
+                0 10px 30px rgba(39, 174, 96, 0.1),
+                0 0 0 1px rgba(39, 174, 96, 0.1);
             border-top: 2px solid #27ae60;
         }
         
@@ -120,7 +161,9 @@
             background: linear-gradient(145deg, #ffffff 0%, #f8fffe 100%);
             border-radius: 15px;
             padding: 30px;
-            box-shadow: 0 10px 30px rgba(39, 174, 96, 0.1);
+            box-shadow: 
+                0 10px 30px rgba(39, 174, 96, 0.1),
+                0 0 0 1px rgba(39, 174, 96, 0.1);
             margin-bottom: 20px;
             border-top: 3px solid #27ae60;
         }
@@ -129,6 +172,7 @@
             display: block;
         }
         
+        /* Park Selection Styles */
         .park-selector {
             background: linear-gradient(145deg, #f7fcf7 0%, #e8f5e8 100%);
             border: 2px solid #52c86a;
@@ -183,6 +227,7 @@
             font-size: 0.9em;
         }
         
+        /* Monitor Tool Styles */
         .status-card {
             background: linear-gradient(145deg, #f8fff8 0%, #f0f8f0 100%);
             border-radius: 12px;
@@ -190,6 +235,12 @@
             margin: 20px 0;
             border-left: 5px solid #27ae60;
             box-shadow: 0 4px 12px rgba(39, 174, 96, 0.1);
+        }
+        
+        .available {
+            border-left-color: #27ae60;
+            background: linear-gradient(145deg, #e8f5e8 0%, #d4edda 100%);
+            color: #155724;
         }
         
         .unavailable {
@@ -203,23 +254,6 @@
             gap: 15px;
             margin: 25px 0;
             flex-wrap: wrap;
-        }
-        
-        .auto-refresh {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin: 15px 0;
-            flex-wrap: wrap;
-        }
-        
-        .notification-settings {
-            background: linear-gradient(145deg, #f7fcf7 0%, #e8f5e8 100%);
-            border: 2px solid #52c86a;
-            border-radius: 10px;
-            padding: 20px;
-            margin: 20px 0;
-            box-shadow: 0 4px 12px rgba(39, 174, 96, 0.1);
         }
         
         button {
@@ -250,11 +284,10 @@
             box-shadow: 0 2px 6px rgba(0,0,0,0.1);
         }
         
-        select {
-            padding: 8px;
-            border-radius: 4px;
-            border: 1px solid #ddd;
-            font-size: 14px;
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #6c757d;
         }
         
         .weekend-dates {
@@ -269,10 +302,30 @@
             box-shadow: 0 4px 12px rgba(39, 174, 96, 0.1);
         }
         
-        .loading {
+        .court-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+            font-size: 14px;
+        }
+        
+        .court-table th, .court-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
             text-align: center;
-            padding: 20px;
-            color: #6c757d;
+        }
+        
+        .court-table th {
+            background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
+            color: white;
+            font-weight: bold;
+            padding: 12px 8px;
+        }
+        
+        .available-slot {
+            background: linear-gradient(145deg, #d4edda 0%, #c3e6cb 100%);
+            color: #155724;
+            font-weight: bold;
         }
         
         .last-checked {
@@ -282,16 +335,58 @@
             margin-top: 20px;
         }
         
+        .notification-settings {
+            background: linear-gradient(145deg, #f7fcf7 0%, #e8f5e8 100%);
+            border: 2px solid #52c86a;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            box-shadow: 0 4px 12px rgba(39, 174, 96, 0.1);
+        }
+        
+        .auto-refresh {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 15px 0;
+            flex-wrap: wrap;
+        }
+        
+        select, input[type="tel"], input[type="text"], input[type="password"] {
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+            font-size: 14px;
+        }
+        
         @media (max-width: 768px) {
-            .container { padding: 10px; }
-            .hero { padding: 25px 20px; }
-            .hero h1 { font-size: 2em; }
-            .nav-tabs { flex-direction: column; }
-            .controls { flex-direction: column; }
-            .park-grid { grid-template-columns: 1fr; }
+            .container {
+                padding: 10px;
+            }
+            
+            .hero {
+                padding: 25px 20px;
+            }
+            
+            .hero h1 {
+                font-size: 2em;
+            }
+            
+            .nav-tabs {
+                flex-direction: column;
+            }
+            
+            .controls {
+                flex-direction: column;
+            }
+            
             .auto-refresh {
                 flex-direction: column;
                 align-items: flex-start;
+            }
+            
+            .park-grid {
+                grid-template-columns: 1fr;
             }
         }
     </style>
@@ -306,10 +401,11 @@
         </div>
         
         <div class="nav-tabs">
-            <button class="nav-tab active" onclick="showTab(event, 'monitor')">Court Monitor</button>
-            <button class="nav-tab" onclick="showTab(event, 'about')">About & Parks</button>
+            <button class="nav-tab active" onclick="showTab('monitor')">Court Monitor</button>
+            <button class="nav-tab" onclick="showTab('about')">About & Parks</button>
         </div>
         
+        <!-- Monitor Tool Tab -->
         <div id="monitor" class="tab-content active">
             <div class="park-selector">
                 <strong>🏞️ Select Parks to Monitor:</strong>
@@ -362,6 +458,7 @@
             <div class="last-checked" id="lastChecked"></div>
         </div>
         
+        <!-- About Tab -->
         <div id="about" class="tab-content">
             <h2>🗽 About NYC Parks Weekend Tennis</h2>
             <p>This tool monitors the official NYC Parks tennis reservation system across 4 boroughs and sends notifications when courts become available for the upcoming weekend.</p>
@@ -372,6 +469,7 @@
                 <p><strong>Courts Monitored:</strong> 25 total reservation courts across all locations</p>
                 <p><strong>System:</strong> Official NYC Parks online reservation system</p>
                 <p><strong>Cost:</strong> $15 per hour for advance reservations (plus permit)</p>
+                <p><strong>Permits:</strong> Season or single-play permits required</p>
             </div>
             
             <h3>🏞️ NYC Tennis Facilities</h3>
@@ -382,30 +480,6 @@
                     <p><strong>Courts:</strong> 6 reservation / 26 total<br>
                     <strong>Surface:</strong> Clay courts<br>
                     <strong>Season:</strong> April 1 - November 24</p>
-                </div>
-                
-                <div class="status-card">
-                    <div style="background: #27ae60; color: white; padding: 4px 8px; border-radius: 12px; font-size: 0.8em; display: inline-block; margin-bottom: 10px;">Queens</div>
-                    <h4 style="color: #27ae60; margin-bottom: 10px;">Alley Pond Park</h4>
-                    <p><strong>Courts:</strong> 4 reservation / 15 total<br>
-                    <strong>Surface:</strong> Hard courts<br>
-                    <strong>Season:</strong> May 12 - September 30</p>
-                </div>
-                
-                <div class="status-card">
-                    <div style="background: #27ae60; color: white; padding: 4px 8px; border-radius: 12px; font-size: 0.8em; display: inline-block; margin-bottom: 10px;">Brooklyn</div>
-                    <h4 style="color: #27ae60; margin-bottom: 10px;">McCarren Park</h4>
-                    <p><strong>Courts:</strong> 2 reservation / 7 total<br>
-                    <strong>Surface:</strong> Hard courts<br>
-                    <strong>Season:</strong> May 4 - September 20</p>
-                </div>
-                
-                <div class="status-card">
-                    <div style="background: #27ae60; color: white; padding: 4px 8px; border-radius: 12px; font-size: 0.8em; display: inline-block; margin-bottom: 10px;">Bronx</div>
-                    <h4 style="color: #27ae60; margin-bottom: 10px;">Mill Pond Park</h4>
-                    <p><strong>Courts:</strong> 3 reservation / 8 total<br>
-                    <strong>Surface:</strong> Hard courts<br>
-                    <strong>Season:</strong> May 5 - October 15</p>
                 </div>
                 
                 <div class="status-card">
@@ -439,12 +513,37 @@
                     <strong>Surface:</strong> Hard courts<br>
                     <strong>Season:</strong> April 21 - September 7</p>
                 </div>
+                
+                <div class="status-card">
+                    <div style="background: #27ae60; color: white; padding: 4px 8px; border-radius: 12px; font-size: 0.8em; display: inline-block; margin-bottom: 10px;">Brooklyn</div>
+                    <h4 style="color: #27ae60; margin-bottom: 10px;">McCarren Park</h4>
+                    <p><strong>Courts:</strong> 2 reservation / 7 total<br>
+                    <strong>Surface:</strong> Hard courts<br>
+                    <strong>Season:</strong> May 4 - September 20</p>
+                </div>
+                
+                <div class="status-card">
+                    <div style="background: #27ae60; color: white; padding: 4px 8px; border-radius: 12px; font-size: 0.8em; display: inline-block; margin-bottom: 10px;">Queens</div>
+                    <h4 style="color: #27ae60; margin-bottom: 10px;">Alley Pond Park</h4>
+                    <p><strong>Courts:</strong> 4 reservation / 15 total<br>
+                    <strong>Surface:</strong> Hard courts<br>
+                    <strong>Season:</strong> May 12 - September 30</p>
+                </div>
+                
+                <div class="status-card">
+                    <div style="background: #27ae60; color: white; padding: 4px 8px; border-radius: 12px; font-size: 0.8em; display: inline-block; margin-bottom: 10px;">Bronx</div>
+                    <h4 style="color: #27ae60; margin-bottom: 10px;">Mill Pond Park</h4>
+                    <p><strong>Courts:</strong> 3 reservation / 8 total<br>
+                    <strong>Surface:</strong> Hard courts<br>
+                    <strong>Season:</strong> May 5 - October 15</p>
+                </div>
             </div>
             
             <div style="text-align: center; margin-top: 30px; padding: 25px; background: linear-gradient(145deg, #f8fff8 0%, #f0f8f0 100%); border-radius: 12px; border: 2px solid #e8f5e8; box-shadow: 0 4px 12px rgba(39, 174, 96, 0.1);">
                 <h3>📞 Contact & Support</h3>
                 <p><strong>Tool Support:</strong> <a href="mailto:tenniscourtmonitor@gmail.com" style="color: #27ae60;">tenniscourtmonitor@gmail.com</a></p>
                 <p><strong>NYC Parks Tennis:</strong> <a href="https://www.nycgovparks.org/things-to-do/tennis" target="_blank" style="color: #27ae60;">Official Tennis Information</a></p>
+                <p><strong>Online Reservations:</strong> <a href="https://www.nycgovparks.org/tennisreservation" target="_blank" style="color: #27ae60;">NYC Parks Reservation System</a></p>
                 <p style="margin-top: 15px; font-size: 0.9em; color: #666;">
                     🌳 Independent monitoring tool for NYC Parks tennis courts • Not affiliated with NYC Parks
                 </p>
@@ -456,25 +555,80 @@
         var autoRefreshInterval = null;
         var isAutoRefreshing = false;
         
+        // NYC Parks tennis facilities data
         var nycParks = [
-            { id: 12, name: "Central Park", borough: "Manhattan", courts: 6, surface: "Clay" },
-            { id: 13, name: "Alley Pond Park", borough: "Queens", courts: 4, surface: "Hard" },
-            { id: 14, name: "McCarren Park", borough: "Brooklyn", courts: 2, surface: "Hard" },
-            { id: 15, name: "Mill Pond Park", borough: "Bronx", courts: 3, surface: "Hard" },
-            { id: 16, name: "Riverside Park (96th St)", borough: "Manhattan", courts: 2, surface: "Clay" },
-            { id: 17, name: "Riverside Park (119th St)", borough: "Manhattan", courts: 2, surface: "Hard" },
-            { id: 18, name: "Randall's Island", borough: "Manhattan", courts: 4, surface: "Hard" },
-            { id: 19, name: "Queensborough Oval", borough: "Manhattan", courts: 2, surface: "Hard" }
+            {
+                id: 12,
+                name: "Central Park",
+                borough: "Manhattan",
+                courts: 6,
+                surface: "Clay",
+                season: "April - November"
+            },
+            {
+                id: 13,
+                name: "Alley Pond Park",
+                borough: "Queens", 
+                courts: 4,
+                surface: "Hard",
+                season: "May - September"
+            },
+            {
+                id: 14,
+                name: "McCarren Park",
+                borough: "Brooklyn",
+                courts: 2,
+                surface: "Hard", 
+                season: "May - September"
+            },
+            {
+                id: 15,
+                name: "Mill Pond Park",
+                borough: "Bronx",
+                courts: 3,
+                surface: "Hard",
+                season: "May - October"
+            },
+            {
+                id: 16,
+                name: "Riverside Park (96th St)",
+                borough: "Manhattan",
+                courts: 2,
+                surface: "Clay",
+                season: "April - September"
+            },
+            {
+                id: 17,
+                name: "Riverside Park (119th St)", 
+                borough: "Manhattan",
+                courts: 2,
+                surface: "Hard",
+                season: "April - September"
+            },
+            {
+                id: 18,
+                name: "Randall's Island",
+                borough: "Manhattan",
+                courts: 4,
+                surface: "Hard",
+                season: "May - September"
+            },
+            {
+                id: 19,
+                name: "Queensborough Oval",
+                borough: "Manhattan",
+                courts: 2,
+                surface: "Hard",
+                season: "April - September"
+            }
         ];
         
-        function showTab(event, tabName) {
-            console.log("Switching to tab: " + tabName);
-            
+        // Tab Management
+        function showTab(tabName) {
             var tabs = document.querySelectorAll('.tab-content');
             for (var i = 0; i < tabs.length; i++) {
                 tabs[i].classList.remove('active');
             }
-            
             var navTabs = document.querySelectorAll('.nav-tab');
             for (var i = 0; i < navTabs.length; i++) {
                 navTabs[i].classList.remove('active');
@@ -484,16 +638,9 @@
             event.target.classList.add('active');
         }
         
+        // Initialize park selector
         function initializeParkSelector() {
-            console.log("Initializing park selector...");
             var parkGrid = document.getElementById('parkGrid');
-            
-            if (!parkGrid) {
-                console.error('Park grid element not found');
-                return;
-            }
-            
-            console.log('Found park grid, adding ' + nycParks.length + ' parks');
             
             for (var i = 0; i < nycParks.length; i++) {
                 var park = nycParks[i];
@@ -508,12 +655,13 @@
                         '</div>' +
                     '</div>';
                 parkGrid.appendChild(parkOption);
-                console.log('Added park: ' + park.name);
             }
             
+            // Load saved selections
             loadParkSelections();
         }
         
+        // Toggle park selection
         function toggleParkSelection(parkId) {
             var checkbox = document.getElementById('park_' + parkId);
             var parkOption = checkbox.closest('.park-option');
@@ -527,6 +675,7 @@
             saveParkSelections();
         }
         
+        // Save park selections to localStorage
         function saveParkSelections() {
             var selectedParks = [];
             for (var i = 0; i < nycParks.length; i++) {
@@ -543,6 +692,7 @@
             }
         }
         
+        // Load park selections from localStorage
         function loadParkSelections() {
             try {
                 var savedParks = localStorage.getItem('selectedParks');
@@ -556,6 +706,7 @@
                         }
                     }
                 } else {
+                    // Default to Central Park selected
                     var centralPark = document.getElementById('park_12');
                     if (centralPark) {
                         centralPark.checked = true;
@@ -567,6 +718,7 @@
             }
         }
         
+        // Get selected parks
         function getSelectedParkIds() {
             var selectedParks = [];
             for (var i = 0; i < nycParks.length; i++) {
@@ -578,9 +730,11 @@
             return selectedParks;
         }
         
-        function updateWeekendDisplay() {
+        // Get this weekend's dates based on current day
+        function getWeekendDates() {
             var today = new Date();
             var dayOfWeek = today.getDay();
+            
             var saturday, sunday;
             
             if (dayOfWeek === 0) {
@@ -595,15 +749,30 @@
                 var daysUntilSaturday = 6 - dayOfWeek;
                 saturday = new Date(today);
                 saturday.setDate(today.getDate() + daysUntilSaturday);
+                
                 sunday = new Date(saturday);
                 sunday.setDate(saturday.getDate() + 1);
             }
             
-            var days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-            var months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+            var formatDate = function(date) {
+                var days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                var months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+                return days[date.getDay()] + ', ' + months[date.getMonth()] + ' ' + date.getDate() + ', ' + date.getFullYear();
+            };
             
-            var saturdayFormatted = days[saturday.getDay()] + ', ' + months[saturday.getMonth()] + ' ' + saturday.getDate() + ', ' + saturday.getFullYear();
-            var sundayFormatted = days[sunday.getDay()] + ', ' + months[sunday.getMonth()] + ' ' + sunday.getDate() + ', ' + sunday.getFullYear();
+            return {
+                saturday: saturday,
+                sunday: sunday,
+                saturdayFormatted: formatDate(saturday),
+                sundayFormatted: formatDate(sunday)
+            };
+        }
+        
+        // Update weekend dates display
+        function updateWeekendDisplay() {
+            var dates = getWeekendDates();
+            var today = new Date();
+            var dayOfWeek = today.getDay();
             
             var weekendLabel = "This Weekend";
             if (dayOfWeek === 0) {
@@ -615,11 +784,11 @@
             }
             
             document.getElementById('weekendDates').innerHTML = 
-                weekendLabel + ': ' + saturdayFormatted + ' & ' + sundayFormatted;
+                weekendLabel + ': ' + dates.saturdayFormatted + ' & ' + dates.sundayFormatted;
         }
         
+        // Check court availability
         function checkAvailability() {
-            console.log("Checking availability...");
             var selectedParkIds = getSelectedParkIds();
             
             if (selectedParkIds.length === 0) {
@@ -659,6 +828,7 @@
             updateLastChecked();
         }
         
+        // Update last checked time
         function updateLastChecked() {
             var now = new Date();
             var lastCheckedEl = document.getElementById('lastChecked');
@@ -667,8 +837,8 @@
             }
         }
         
+        // Play test sound
         function playTestSound() {
-            console.log('Playing test sound...');
             try {
                 var audioContext = new (window.AudioContext || window.webkitAudioContext)();
                 var oscillator = audioContext.createOscillator();
@@ -690,39 +860,29 @@
             }
         }
         
+        // Toggle auto refresh
         function toggleAutoRefresh() {
             var autoBtn = document.getElementById('autoBtn');
-            var checkBtn = document.getElementById('checkBtn');
             var intervalSelect = document.getElementById('refreshInterval');
             
             if (isAutoRefreshing) {
                 clearInterval(autoRefreshInterval);
                 autoBtn.textContent = 'Start Auto-Check';
-                checkBtn.disabled = false;
                 intervalSelect.disabled = false;
                 isAutoRefreshing = false;
-                console.log('Auto-refresh stopped');
             } else {
                 var interval = parseInt(intervalSelect.value) * 1000;
                 autoRefreshInterval = setInterval(checkAvailability, interval);
                 autoBtn.textContent = 'Stop Auto-Check';
-                checkBtn.disabled = true;
                 intervalSelect.disabled = true;
                 isAutoRefreshing = true;
-                console.log('Auto-refresh started - checking every ' + intervalSelect.value + ' seconds');
                 
                 checkAvailability();
             }
         }
         
+        // Initialize
         window.onload = function() {
-            console.log("Initializing NYC Parks Tennis Monitor...");
-            
-            try {
-                initializeParkSelector();
-                updateWeekendDisplay();
-                console.log("Initialization complete!");
-            } catch (error) {
-                console.error("Initialization error:", error);
-            }
+            initializeParkSelector();
+            updateWeekendDisplay();
         };
