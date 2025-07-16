@@ -481,8 +481,8 @@
         </div>
         
         <div class="nav-tabs">
-            <button class="nav-tab active" onclick="showTab('monitor')">Court Monitor</button>
-            <button class="nav-tab" onclick="showTab('about')">About & Parks</button>
+            <button class="nav-tab active" onclick="showTab(event, 'monitor')">Court Monitor</button>
+            <button class="nav-tab" onclick="showTab(event, 'about')">About & Parks</button>
         </div>
         
         <!-- Monitor Tool Tab -->
@@ -813,7 +813,8 @@
         ];
         
         // Tab Management
-        function showTab(tabName) {
+        function showTab(event, tabName) {
+            // Hide all tabs
             document.querySelectorAll('.tab-content').forEach(tab => {
                 tab.classList.remove('active');
             });
@@ -821,6 +822,7 @@
                 tab.classList.remove('active');
             });
             
+            // Show selected tab
             document.getElementById(tabName).classList.add('active');
             event.target.classList.add('active');
         }
@@ -828,6 +830,13 @@
         // Initialize park selector
         function initializeParkSelector() {
             const parkGrid = document.getElementById('parkGrid');
+            
+            if (!parkGrid) {
+                console.error('Park grid element not found');
+                return;
+            }
+            
+            console.log('🏞️ Initializing park selector with', nycParks.length, 'parks');
             
             nycParks.forEach(park => {
                 const parkOption = document.createElement('div');
@@ -842,6 +851,7 @@
                     </div>
                 `;
                 parkGrid.appendChild(parkOption);
+                console.log('✅ Added park:', park.name);
             });
             
             // Load saved selections
