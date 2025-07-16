@@ -751,7 +751,7 @@
             return filteredSlots;
         }
         
-        // Parse court data from HTML content
+        // Parse court data from HTML content with stricter date matching
         function parseCourtData(htmlContent, parkId) {
             console.log('🔍 Parsing data for park ' + parkId);
             
@@ -785,76 +785,150 @@
                 return results;
             }
             
-            // Split HTML into lines and process
-            var lines = htmlContent.split('\n');
-            var currentDateSection = '';
-            var inTargetSaturday = false;
-            var inTargetSunday = false;
-            
-            for (var i = 0; i < lines.length; i++) {
-                var line = lines[i].trim();
+            // Use DOM parsing for more accurate structure analysis
+            try {
+                var parser = new DOMParser();
+                var doc = parser.parseFromString(htmlContent, 'text/html');
                 
-                // Look for date headers
-                if (line.indexOf('Saturday') !== -1 && line.indexOf('2025') !== -1) {
-                    currentDateSection = line;
-                    inTargetSaturday = line.indexOf(saturdayStr) !== -1;
-                    inTargetSunday = false;
-                    console.log('📅 Found Saturday line: "' + line.substring(0, 50) + '" -> Target: ' + inTargetSaturday);
-                } else if (line.indexOf('Sunday') !== -1 && line.indexOf('2025') !== -1) {
-                    currentDateSection = line;
-                    inTargetSunday = line.indexOf(sundayStr) !== -1;
-                    inTargetSaturday = false;
-                    console.log('📅 Found Sunday line: "' + line.substring(0, 50) + '" -> Target: ' + inTargetSunday);
-                }
+                // Look for date-specific sections
+                var dateElements = doc.querySelectorAll('h3, .tab-pane, [id*="2025"], .day-header');
                 
-                // Only process Reserve links when we're in the right date section
-                if ((inTargetSaturday || inTargetSunday) && 
-                    line.indexOf('Reserve this time') !== -1 && 
-                    line.indexOf('/tennisreservation/reservecp/') !== -1) {
+                for (var i = 0; i < dateElements.length; i++) {
+                    var element = dateElements[i];
+                    var elementText = element.textContent || '';
+                    var elementId = element.id || '';
                     
-                    // Extract time from the line or surrounding lines
-                    var timeMatch = line.match(/(\d{1,2}:\d{2}\s*[ap]\.?m\.?)/i);
+                    // Check if this element represents our target weekend
+                    var isSaturdaySection = elementText.indexOf(saturdayStr) !== -1;
+                    var isSundaySection = elementText.indexOf(sundayStr) !== -1;
                     
-                    // If no time in current line, look in previous lines
-                    if (!timeMatch) {
-                        for (var j = Math.max(0, i - 3); j < i; j++) {
-                            timeMatch = lines[j].match(/(\d{1,2}:\d{2}\s*[ap]\.?m\.?)/i);
-                            if (timeMatch) break;
+                    if (isSaturdaySection || isSundaySection) {
+                        console.log('📅 Found ' + (isSaturdaySection ? 'Saturday' : 'Sunday') + ' section: ' + elementText.substring(0, 100));
+                        
+                        // Look for tables within or after this section
+                        var tableContainer = element;
+                        if (element.tagName === 'H3') {
+                            // For h3 headers, look for the next sibling container
+                            tableContainer = element.parentElement;
                         }
-                    }
-                    
-                    var linkMatch = line.match(/href="([^"]*tennisreservation\/reservecp\/[^"]*)"/);
-                    
-                    if (timeMatch && linkMatch) {
-                        // Extract court number
-                        var courtNum = 'Unknown';
-                        var courtMatch = line.match(/Court\s*(\d+)/i);
-                        if (courtMatch) {
-                            courtNum = courtMatch[1];
-                        } else {
-                            // Look in surrounding lines for court info
-                            for (var k = Math.max(0, i - 2); k <= Math.min(lines.length - 1, i + 2); k++) {
-                                var surroundingCourtMatch = lines[k].match(/Court\s*(\d+)/i);
-                                if (surroundingCourtMatch) {
-                                    courtNum = surroundingCourtMatch[1];
-                                    break;
+                        
+                        var tables = tableContainer.querySelectorAll('table');
+                        
+                        for (var j = 0; j < tables.length; j++) {
+                            var table = tables[j];
+                            var rows = table.querySelectorAll('tr');
+                            
+                            for (var k = 0; k < rows.length; k++) {
+                                var row = rows[k];
+                                var cells = row.querySelectorAll('td, th');
+                                
+                                if (cells.length > 0) {
+                                    // Look for time in first cell
+                                    var firstCellText = cells[0].textContent || '';
+                                    var timeMatch = firstCellText.match(/(\d{1,2}:\d{2}\s*[ap]\.?m\.?)/i);
+                                    
+                                    if (timeMatch) {
+                                        // Check each cell for reserve links
+                                        for (var l = 0; l < cells.length; l++) {
+                                            var cell = cells[l];
+                                            var reserveLink = cell.querySelector('a[href*="/tennisreservation/reservecp/"], a[href*="/tennisreservation/reserve/"]');
+                                            
+                                            if (reserveLink && cell.textContent.indexOf('Reserve this time') !== -1) {
+                                                // Get court number from table header
+                                                var courtNumber = 'Unknown';
+                                                var tableHeaders = table.querySelectorAll('th');
+                                                if (tableHeaders[l]) {
+                                                    var headerText = tableHeaders[l].textContent;
+                                                    var courtMatch = headerText.match(/Court\s*(\d+)/i);
+                                                    if (courtMatch) {
+                                                        courtNumber = courtMatch[1];
+                                                    }
+                                                }
+                                                
+                                                var slot = {
+                                                    time: timeMatch[1],
+                                                    court: courtNumber,
+                                                    link: reserveLink.getAttribute('href'),
+                                                    park: results.parkName
+                                                };
+                                                
+                                                if (isSaturdaySection) {
+                                                    results.saturday.available.push(slot);
+                                                    console.log('➕ Added to Saturday: ' + slot.time + ' Court ' + slot.court);
+                                                } else if (isSundaySection) {
+                                                    results.sunday.available.push(slot);
+                                                    console.log('➕ Added to Sunday: ' + slot.time + ' Court ' + slot.court);
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
+                    }
+                }
+            } catch (error) {
+                console.error('❌ DOM parsing error for park ' + parkId + ':', error);
+                
+                // Fallback to line-by-line parsing with much stricter matching
+                var lines = htmlContent.split('\n');
+                var inTargetDateSection = false;
+                var currentTargetDay = null;
+                
+                for (var i = 0; i < lines.length; i++) {
+                    var line = lines[i].trim();
+                    
+                    // Very strict date section detection
+                    if (line.indexOf(saturdayStr) !== -1) {
+                        inTargetDateSection = true;
+                        currentTargetDay = 'saturday';
+                        console.log('📅 STRICT: Found Saturday section at line ' + i);
+                        continue;
+                    } else if (line.indexOf(sundayStr) !== -1) {
+                        inTargetDateSection = true;
+                        currentTargetDay = 'sunday';
+                        console.log('📅 STRICT: Found Sunday section at line ' + i);
+                        continue;
+                    }
+                    
+                    // Exit target section if we hit another date
+                    if (inTargetDateSection && line.match(/\w+,\s+\w+\s+\d{1,2},\s+\d{4}/) && 
+                        line.indexOf(saturdayStr) === -1 && line.indexOf(sundayStr) === -1) {
+                        inTargetDateSection = false;
+                        currentTargetDay = null;
+                        console.log('📅 STRICT: Exited target section at line ' + i + ' due to: ' + line.substring(0, 50));
+                        continue;
+                    }
+                    
+                    // Only process reserve links when strictly in target section
+                    if (inTargetDateSection && currentTargetDay && 
+                        line.indexOf('Reserve this time') !== -1 && 
+                        line.indexOf('/tennisreservation/reservecp/') !== -1) {
                         
-                        var slot = {
-                            time: timeMatch[1],
-                            court: courtNum,
-                            link: linkMatch[1],
-                            park: results.parkName
-                        };
+                        var timeMatch = line.match(/(\d{1,2}:\d{2}\s*[ap]\.?m\.?)/i);
+                        var linkMatch = line.match(/href="([^"]*tennisreservation\/reservecp\/[^"]*)"/);
                         
-                        if (inTargetSaturday) {
-                            results.saturday.available.push(slot);
-                            console.log('➕ Added to Saturday: ' + slot.time + ' Court ' + slot.court);
-                        } else if (inTargetSunday) {
-                            results.sunday.available.push(slot);
-                            console.log('➕ Added to Sunday: ' + slot.time + ' Court ' + slot.court);
+                        if (timeMatch && linkMatch) {
+                            var courtNum = 'Unknown';
+                            var courtMatch = line.match(/Court\s*(\d+)/i);
+                            if (courtMatch) {
+                                courtNum = courtMatch[1];
+                            }
+                            
+                            var slot = {
+                                time: timeMatch[1],
+                                court: courtNum,
+                                link: linkMatch[1],
+                                park: results.parkName
+                            };
+                            
+                            if (currentTargetDay === 'saturday') {
+                                results.saturday.available.push(slot);
+                                console.log('➕ STRICT: Added to Saturday: ' + slot.time + ' Court ' + slot.court);
+                            } else if (currentTargetDay === 'sunday') {
+                                results.sunday.available.push(slot);
+                                console.log('➕ STRICT: Added to Sunday: ' + slot.time + ' Court ' + slot.court);
+                            }
                         }
                     }
                 }
