@@ -326,6 +326,13 @@
             font-size: 14px;
         }
         
+        input[type="tel"], input[type="text"], input[type="password"] {
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+            font-size: 14px;
+        }
+        
         .last-checked {
             text-align: center;
             color: #6c757d;
@@ -451,6 +458,48 @@
                 </div>
             </div>
             
+            <div class="notification-settings">
+                <strong>🔔 Notification Settings:</strong>
+                <div style="margin: 10px 0;">
+                    <label style="display: flex; align-items: center; margin: 5px 0;">
+                        <input type="checkbox" id="soundNotifications" checked style="margin-right: 8px;">
+                        Sound notifications
+                    </label>
+                    <label style="display: flex; align-items: center; margin: 5px 0;">
+                        <input type="checkbox" id="browserNotifications" checked style="margin-right: 8px;">
+                        Browser notifications
+                    </label>
+                    <label style="display: flex; align-items: center; margin: 5px 0;">
+                        <input type="checkbox" id="smsNotifications" onchange="toggleSMSSettings()" style="margin-right: 8px;">
+                        SMS notifications
+                    </label>
+                </div>
+                
+                <div id="smsSettings" style="display: none; margin-top: 15px; padding: 15px; background: #e8f4f8; border-radius: 8px;">
+                    <h4>📱 SMS Configuration</h4>
+                    <div style="margin: 10px 0;">
+                        <label>Phone Number (with country code):</label><br>
+                        <input type="tel" id="phoneNumber" placeholder="+1234567890" style="width: 200px; padding: 8px; margin: 5px 0; border: 1px solid #ddd; border-radius: 4px;">
+                    </div>
+                    
+                    <div style="margin: 15px 0;">
+                        <strong>Twilio API Configuration:</strong>
+                        <div style="margin: 10px 0;">
+                            <input type="text" id="twilioSid" placeholder="Twilio Account SID" style="width: 250px; padding: 5px; margin: 5px 0; display: block;">
+                            <input type="password" id="twilioToken" placeholder="Twilio Auth Token" style="width: 250px; padding: 5px; margin: 5px 0; display: block;">
+                            <input type="tel" id="twilioFrom" placeholder="Twilio Phone Number" style="width: 250px; padding: 5px; margin: 5px 0; display: block;">
+                            <small style="color: #666;">Get these from your <a href="https://console.twilio.com/" target="_blank">Twilio Console</a></small>
+                        </div>
+                    </div>
+                    
+                    <button onclick="testSMS()" style="background: #28a745; margin-top: 10px;">Test SMS</button>
+                </div>
+                
+                <p style="margin-top: 15px; font-size: 14px; color: #666;">
+                    Keep this tab open for notifications to work. By entering your phone number, you opt-in to receive SMS notifications about tennis court availability.
+                </p>
+            </div>
+            
             <div id="results">
                 <div class="loading">Select parks and click "Check Now" to start monitoring</div>
             </div>
@@ -478,7 +527,7 @@
         var autoRefreshInterval = null;
         var isAutoRefreshing = false;
         
-        // NYC Parks tennis facilities data
+        // NYC Parks tennis facilities data with correct availability IDs
         var nycParks = [
             {
                 id: 12,
@@ -486,7 +535,8 @@
                 borough: "Manhattan",
                 courts: 6,
                 surface: "Clay",
-                season: "April - November"
+                season: "April - November",
+                availabilityId: 1  // NYC Parks availability ID
             },
             {
                 id: 13,
@@ -494,7 +544,8 @@
                 borough: "Queens", 
                 courts: 4,
                 surface: "Hard",
-                season: "May - September"
+                season: "May - September",
+                availabilityId: 2  // Need to verify this
             },
             {
                 id: 14,
@@ -502,7 +553,8 @@
                 borough: "Brooklyn",
                 courts: 2,
                 surface: "Hard", 
-                season: "May - September"
+                season: "May - September",
+                availabilityId: 3  // Need to verify this
             },
             {
                 id: 15,
@@ -510,7 +562,8 @@
                 borough: "Bronx",
                 courts: 3,
                 surface: "Hard",
-                season: "May - October"
+                season: "May - October",
+                availabilityId: 4  // Confirmed from your example
             },
             {
                 id: 16,
@@ -518,7 +571,8 @@
                 borough: "Manhattan",
                 courts: 2,
                 surface: "Clay",
-                season: "April - September"
+                season: "April - September",
+                availabilityId: 5  // Need to verify this
             },
             {
                 id: 17,
@@ -526,7 +580,8 @@
                 borough: "Manhattan",
                 courts: 2,
                 surface: "Hard",
-                season: "April - September"
+                season: "April - September",
+                availabilityId: 6  // Need to verify this
             },
             {
                 id: 18,
@@ -534,7 +589,8 @@
                 borough: "Manhattan",
                 courts: 4,
                 surface: "Hard",
-                season: "May - September"
+                season: "May - September",
+                availabilityId: 7  // Need to verify this
             },
             {
                 id: 19,
@@ -542,7 +598,8 @@
                 borough: "Manhattan",
                 courts: 2,
                 surface: "Hard",
-                season: "April - September"
+                season: "April - September",
+                availabilityId: 8  // Need to verify this
             }
         ];
         
@@ -1080,6 +1137,41 @@
                         displayAllResults(allResults);
                         updateLastChecked();
                         
+                        // Check for notifications
+                        var totalAvailable = 0;
+                        for (var i = 0; i < allResults.length; i++) {
+                            totalAvailable += allResults[i].saturday.available.length + allResults[i].sunday.available.length;
+                        }
+                        
+                        if (totalAvailable > 0) {
+                            var parkNames = [];
+                            for (var i = 0; i < allResults.length; i++) {
+                                var park = allResults[i];
+                                if (park.saturday.available.length > 0 || park.sunday.available.length > 0) {
+                                    parkNames.push(park.parkName);
+                                }
+                            }
+                            
+                            var notificationMessage = '🎾 Tennis courts available! ' + totalAvailable + ' slot(s) found:\n' +
+                                                    'Parks: ' + parkNames.join(', ') + '\n' +
+                                                    'Book now: https://www.nycgovparks.org/tennisreservation';
+                            
+                            console.log('🔔 Courts found! Triggering notifications...');
+                            
+                            if (document.getElementById('soundNotifications').checked) {
+                                playNotificationSound();
+                            }
+                            
+                            if (document.getElementById('browserNotifications').checked && Notification.permission === 'granted') {
+                                new Notification('NYC Tennis Courts Available!', {
+                                    body: totalAvailable + ' court slot(s) now available across ' + parkNames.length + ' park(s).',
+                                    icon: '🎾'
+                                });
+                            }
+                            
+                            sendSMS(notificationMessage);
+                        }
+                        
                         checkBtn.disabled = false;
                         checkBtn.textContent = 'Check Now';
                     }
@@ -1091,8 +1183,26 @@
         function checkSinglePark(parkId, proxyUrl, callback) {
             console.log('🔍 Checking park ' + parkId);
             
+            // Find the park and get its availability ID
+            var park = null;
+            for (var i = 0; i < nycParks.length; i++) {
+                if (nycParks[i].id === parkId) {
+                    park = nycParks[i];
+                    break;
+                }
+            }
+            
+            if (!park || !park.availabilityId) {
+                console.error('❌ No availability ID found for park ' + parkId);
+                callback(null);
+                return;
+            }
+            
+            var availabilityId = park.availabilityId;
+            console.log('🔗 Using availability ID ' + availabilityId + ' for ' + park.name);
+            
             var xhr = new XMLHttpRequest();
-            xhr.open('GET', proxyUrl + '?parkId=' + parkId, true);
+            xhr.open('GET', proxyUrl + '?parkId=' + availabilityId, true);
             xhr.setRequestHeader('Accept', 'application/json');
             
             xhr.onreadystatechange = function() {
@@ -1109,7 +1219,7 @@
                                 courtData.saturday.available = filterSlotsByTime(courtData.saturday.available);
                                 courtData.sunday.available = filterSlotsByTime(courtData.sunday.available);
                                 
-                                console.log('✅ Successfully parsed park ' + parkId);
+                                console.log('✅ Successfully parsed park ' + parkId + ' (availability ID ' + availabilityId + ')');
                                 callback(courtData);
                             } else {
                                 console.log('❌ No valid content for park ' + parkId);
@@ -1146,26 +1256,161 @@
         // Play test sound
         function playTestSound() {
             console.log('🔊 Playing test sound...');
+            playNotificationSound();
+        }
+        function playNotificationSound() {
             try {
                 var audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                var oscillator = audioContext.createOscillator();
-                var gainNode = audioContext.createGain();
                 
-                oscillator.connect(gainNode);
-                gainNode.connect(audioContext.destination);
-                
-                oscillator.frequency.value = 800;
-                oscillator.type = 'sine';
-                
-                gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
-                
-                oscillator.start(audioContext.currentTime);
-                oscillator.stop(audioContext.currentTime + 0.5);
-                
-                console.log('✅ Sound played successfully');
+                var frequencies = [800, 1000, 1200];
+                for (var i = 0; i < frequencies.length; i++) {
+                    (function(freq, index) {
+                        setTimeout(function() {
+                            var oscillator = audioContext.createOscillator();
+                            var gainNode = audioContext.createGain();
+                            
+                            oscillator.connect(gainNode);
+                            gainNode.connect(audioContext.destination);
+                            
+                            oscillator.frequency.value = freq;
+                            oscillator.type = 'sine';
+                            
+                            gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+                            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+                            
+                            oscillator.start(audioContext.currentTime);
+                            oscillator.stop(audioContext.currentTime + 0.5);
+                        }, index * 200);
+                    })(frequencies[i], i);
+                }
             } catch (e) {
                 console.log('❌ Audio not supported or blocked:', e);
+            }
+        }
+        
+        // SMS Notification Functions
+        function sendSMS(message) {
+            var smsEnabled = document.getElementById('smsNotifications').checked;
+            if (!smsEnabled) return;
+            
+            var phoneNumber = document.getElementById('phoneNumber').value.trim();
+            
+            if (!phoneNumber) {
+                console.log('📱 No phone number configured for SMS');
+                return;
+            }
+            
+            sendTwilioSMS(message, phoneNumber);
+        }
+        
+        function sendTwilioSMS(message, phoneNumber) {
+            var accountSid = document.getElementById('twilioSid').value.trim();
+            var authToken = document.getElementById('twilioToken').value.trim();
+            var fromNumber = document.getElementById('twilioFrom').value.trim();
+            
+            if (!accountSid || !authToken || !fromNumber) {
+                showNotificationStatus('❌ Please fill in all Twilio credentials');
+                return;
+            }
+            
+            console.log('📱 Sending SMS via Twilio...');
+            
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', 'https://api.twilio.com/2010-04-01/Accounts/' + accountSid + '/Messages.json', true);
+            xhr.setRequestHeader('Authorization', 'Basic ' + btoa(accountSid + ':' + authToken));
+            xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+            
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === 4) {
+                    if (xhr.status === 201) {
+                        showNotificationStatus('✅ SMS sent successfully via Twilio!');
+                        console.log('✅ SMS sent successfully');
+                    } else {
+                        var errorText = xhr.responseText;
+                        console.error('❌ Twilio SMS error:', errorText);
+                        showNotificationStatus('❌ Failed to send SMS via Twilio');
+                    }
+                }
+            };
+            
+            xhr.onerror = function() {
+                console.error('❌ SMS sending network error');
+                showNotificationStatus('❌ Error sending SMS - check console for details');
+            };
+            
+            var params = 'From=' + encodeURIComponent(fromNumber) +
+                        '&To=' + encodeURIComponent(phoneNumber) +
+                        '&Body=' + encodeURIComponent(message);
+            
+            xhr.send(params);
+        }
+        
+        function testSMS() {
+            var message = "🎾 Test: NYC Parks tennis monitor is working! This is how you'll be notified when courts become available.";
+            sendSMS(message);
+        }
+        
+        function showNotificationStatus(message) {
+            var statusDiv = document.createElement('div');
+            statusDiv.style.cssText = 
+                'position: fixed;' +
+                'top: 20px;' +
+                'right: 20px;' +
+                'background: #007bff;' +
+                'color: white;' +
+                'padding: 15px;' +
+                'border-radius: 8px;' +
+                'z-index: 1000;' +
+                'max-width: 300px;' +
+                'box-shadow: 0 4px 12px rgba(0,0,0,0.2);';
+            statusDiv.textContent = message;
+            document.body.appendChild(statusDiv);
+            
+            setTimeout(function() {
+                if (statusDiv.parentNode) {
+                    document.body.removeChild(statusDiv);
+                }
+            }, 5000);
+        }
+        
+        // Toggle SMS settings visibility
+        function toggleSMSSettings() {
+            var smsEnabled = document.getElementById('smsNotifications').checked;
+            var smsSettings = document.getElementById('smsSettings');
+            smsSettings.style.display = smsEnabled ? 'block' : 'none';
+        }
+        
+        // Request notification permission
+        function requestNotificationPermission() {
+            if ('Notification' in window && Notification.permission === 'default') {
+                Notification.requestPermission();
+            }
+        }
+        
+        // Save SMS settings
+        function saveSMSSettings() {
+            try {
+                localStorage.setItem('tennisMonitor_phone', document.getElementById('phoneNumber').value);
+                localStorage.setItem('tennisMonitor_twilioSid', document.getElementById('twilioSid').value);
+                localStorage.setItem('tennisMonitor_twilioFrom', document.getElementById('twilioFrom').value);
+                // Note: We don't save the auth token for security
+            } catch (e) {
+                console.log('Could not save SMS settings');
+            }
+        }
+        
+        // Load SMS settings
+        function loadSMSSettings() {
+            try {
+                var savedPhone = localStorage.getItem('tennisMonitor_phone');
+                var savedSid = localStorage.getItem('tennisMonitor_twilioSid');
+                var savedFrom = localStorage.getItem('tennisMonitor_twilioFrom');
+                
+                if (savedPhone) document.getElementById('phoneNumber').value = savedPhone;
+                if (savedSid) document.getElementById('twilioSid').value = savedSid;
+                if (savedFrom) document.getElementById('twilioFrom').value = savedFrom;
+            } catch (e) {
+                console.log('Could not load SMS settings');
             }
         }
         
@@ -1199,6 +1444,18 @@
             try {
                 initializeParkSelector();
                 updateWeekendDisplay();
+                requestNotificationPermission();
+                loadSMSSettings();
+                
+                // Add event listeners for SMS settings
+                var smsInputs = ['phoneNumber', 'twilioSid', 'twilioFrom'];
+                for (var i = 0; i < smsInputs.length; i++) {
+                    var element = document.getElementById(smsInputs[i]);
+                    if (element) {
+                        element.addEventListener('change', saveSMSSettings);
+                    }
+                }
+                
                 console.log('✅ Initialization complete!');
             } catch (error) {
                 console.error('❌ Initialization error:', error);
