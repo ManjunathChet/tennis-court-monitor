@@ -1399,7 +1399,7 @@
             return results;
         }'), 'g'));
             
-            console.log(`🎯 Exact date matches: Saturday=${saturdayMatches?.length || 0}, Sunday=${sundayMatches?.length || 0}`);
+            console.log(`🎯 Exact date matches: Saturday=${saturdayMatches}, Sunday=${sundayMatches}`);
             
             if (!saturdayMatches && !sundayMatches) {
                 console.log(`❌ No target weekend dates found in HTML for park ${parkId}`);
