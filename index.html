@@ -788,15 +788,27 @@
                         }
                     }
                 } else {
-                    // Default to Central Park selected
-                    var centralPark = document.getElementById('park_12');
-                    if (centralPark) {
-                        centralPark.checked = true;
-                        toggleParkSelection(12);
+                    // Default selection: Central Park, McCarren Park, and Riverside Park (96th St)
+                    var defaultParks = [12, 14, 16]; // Central Park (12), McCarren Park (14), Riverside Park 96th St (16)
+                    for (var i = 0; i < defaultParks.length; i++) {
+                        var checkbox = document.getElementById('park_' + defaultParks[i]);
+                        if (checkbox) {
+                            checkbox.checked = true;
+                            toggleParkSelection(defaultParks[i]);
+                        }
                     }
                 }
             } catch (e) {
                 console.log('Could not load park selections');
+                // Fallback to default selection if localStorage fails
+                var defaultParks = [12, 14, 16];
+                for (var i = 0; i < defaultParks.length; i++) {
+                    var checkbox = document.getElementById('park_' + defaultParks[i]);
+                    if (checkbox) {
+                        checkbox.checked = true;
+                        toggleParkSelection(defaultParks[i]);
+                    }
+                }
             }
         }
         
